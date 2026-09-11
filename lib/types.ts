@@ -156,6 +156,16 @@ export interface Booking {
   refundReference?: string;
 
   payhereRef: string;
+  gatewayResponse?: {
+    merchantId?: string;
+    orderId?: string;
+    payhereAmount?: number;
+    payhereCurrency?: string;
+    statusCode?: number;
+    statusMessage?: string;
+    method?: string;
+    raw?: Record<string, any>;
+  };
   bookedBy?: BookingCreator;
   videoLink?: string;
   confirmationSmsSent?: boolean;

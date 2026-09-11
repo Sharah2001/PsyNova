@@ -137,6 +137,8 @@ export class BookingEntity {
     name: "reschedule_status",
     default: "none",
   })
+  rescheduleStatus!: RescheduleStatus;
+
   @Column("timestamptz", {
     name: "reschedule_requested_at",
     nullable: true,
@@ -160,8 +162,6 @@ export class BookingEntity {
     nullable: true,
   })
   previousSlotDatetime!: string | null;
-
-  rescheduleStatus!: RescheduleStatus;
 
   @Column("varchar", {
     name: "proposed_slot_id",

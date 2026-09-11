@@ -4,11 +4,15 @@ import { getNestServices } from "../../../../server/nest-app";
 
 export const dynamic = "force-dynamic";
 
+const getPayHereConfig = () => ({
+  merchantId: process.env.PAYHERE_MERCHANT_ID || "",
+});
+
 export async function GET() {
   try {
     const { payHereService } = await getNestServices();
 
-    return NextResponse.json(payHereService.getPayHereConfig());
+    return NextResponse.json(getPayHereConfig());
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to get PayHere config";
@@ -122,60 +126,124 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    /*
-     * ------------------------------------------------------------
-     * ACTION: CHECKOUT PARAMS
-     * ------------------------------------------------------------
-     */
     if (body.action === "checkout-params") {
-      const forwardedHost = req.headers.get("x-forwarded-host");
-      const originHeader = req.headers.get("origin");
-      const hostHeader = req.headers.get("host");
-      const forwardedProto = req.headers.get("x-forwarded-proto");
-
-      const proto =
-        forwardedProto === "http" || forwardedProto === "https"
-          ? forwardedProto
-          : "https";
-
-      let baseUrl = typeof body.baseUrl === "string" ? body.baseUrl.trim() : "";
-
       /*
-       * Never use localhost for PayHere return/notify URLs when
-       * generating a real checkout configuration.
+       * ------------------------------------------------------------
+       * SECURITY:
+       * Only accept bookingId from the browser.
+       *
+       * Amount, patient details and order ID are loaded from the
+       * server-side booking so the client cannot modify the amount
+       * used to generate the PayHere hash.
+       * ------------------------------------------------------------
        */
-      if (!baseUrl || baseUrl.includes("localhost")) {
-        if (forwardedHost && !forwardedHost.includes("localhost")) {
-          baseUrl = `${proto}://${forwardedHost}`;
-        } else if (originHeader && !originHeader.includes("localhost")) {
-          baseUrl = originHeader;
-        } else if (hostHeader && !hostHeader.includes("localhost")) {
-          baseUrl = `${proto}://${hostHeader}`;
-        }
-      }
 
-      /*
-       * Remove a trailing slash so we don't accidentally generate:
-       * https://example.com//api/payhere/notify
-       */
-      baseUrl = baseUrl.replace(/\/+$/, "");
+      const bookingId = String(body.bookingId || "").trim();
 
-      if (!baseUrl) {
+      if (!bookingId) {
         return NextResponse.json(
-          {
-            error:
-              "Unable to determine application base URL. Please provide baseUrl.",
-          },
+          { error: "bookingId is required" },
           { status: 400 },
         );
       }
 
-      const params = payHereService.createCheckoutParams({
-        ...body,
-        baseUrl,
-      });
+      // APP_URL is used by PayHereService to build return/cancel/notify URLs.
+      const appUrl = process.env.APP_URL?.trim() || "";
 
-      return NextResponse.json(params);
+      if (!appUrl) {
+        return NextResponse.json(
+          { error: "APP_URL is not configured on the server." },
+          { status: 500 },
+        );
+      }
+
+      try {
+        // Load the booking from PostgreSQL / server-side source of truth.
+        const booking = await bookingsService.findOne(bookingId);
+
+        if (!booking) {
+          return NextResponse.json(
+            { error: `Booking ${bookingId} was not found.` },
+            { status: 404 },
+          );
+        }
+
+        // Only pending bookings should enter PayHere checkout.
+        if (
+          booking.status !== "pending" ||
+          booking.paymentStatus !== "pending"
+        ) {
+          return NextResponse.json(
+            {
+              error: `Booking ${bookingId} is not available for payment. Current status: ${booking.status}, payment status: ${booking.paymentStatus}.`,
+            },
+            { status: 400 },
+          );
+        }
+
+        if (
+          !Number.isFinite(Number(booking.feeLkr)) ||
+          Number(booking.feeLkr) <= 0
+        ) {
+          return NextResponse.json(
+            { error: "Booking has an invalid payment amount." },
+            { status: 400 },
+          );
+        }
+
+        /*
+         * PayHere expects first_name and last_name separately.
+         * Split the stored patient name safely.
+         */
+        const fullName = String(booking.patientName || "Patient").trim();
+
+        const nameParts = fullName.split(/\s+/).filter(Boolean);
+
+        const firstName = nameParts.shift() || "Patient";
+        const lastName = nameParts.join(" ") || "Patient";
+
+        const params = payHereService.createCheckoutParams({
+          orderId: booking.id,
+          amount: Number(booking.feeLkr),
+
+          firstName,
+          lastName,
+
+          email: booking.patientEmail || "patient@example.lk",
+          phone: booking.patientContact || "",
+
+          address: "Sri Lanka",
+          city: "Colombo",
+
+          items: `Psychiatrist Consultation - ${booking.doctorName}`,
+          currency: "LKR",
+        });
+
+        console.log("[PayHere] Checkout parameters generated.");
+        console.log("[PayHere] Booking ID:", booking.id);
+        console.log("[PayHere] Amount:", Number(booking.feeLkr).toFixed(2));
+        console.log("[PayHere] Currency: LKR");
+        console.log("[PayHere] Notify URL:", params.params.notify_url);
+
+        return NextResponse.json(params);
+      } catch (error: unknown) {
+        console.error(
+          "[PayHere] Failed to generate checkout parameters:",
+          error,
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to generate PayHere checkout parameters";
+
+        return NextResponse.json(
+          {
+            error: message,
+          },
+          { status: 500 },
+        );
+      }
     }
 
     /*
@@ -216,7 +284,7 @@ export async function POST(req: NextRequest) {
 
       const currency = body.currency || "LKR";
 
-      const config = payHereService.getPayHereConfig();
+      const config = getPayHereConfig();
 
       const paymentId =
         body.paymentId ||
@@ -277,7 +345,7 @@ export async function POST(req: NextRequest) {
         payment_id: paymentId,
         payhere_amount: formattedAmount,
         payhere_currency: currency,
-        status_code: statusCode,
+        status_code: String(statusCode),
         md5sig,
         status_message:
           statusCode === 2
@@ -289,7 +357,7 @@ export async function POST(req: NextRequest) {
        * Verify the generated notification exactly like a real
        * PayHere notification.
        */
-      const isValid = payHereService.verifyNotificationHash(simulateBody);
+      const isValid = payHereService.verifyNotification(simulateBody);
 
       if (!isValid) {
         return NextResponse.json(
@@ -308,6 +376,12 @@ export async function POST(req: NextRequest) {
         paymentId,
         statusCode,
         `Simulated PayHere notify callback (status_code ${statusCode})`,
+        {
+          merchantId: config.merchantId,
+          amount,
+          currency,
+          raw: simulateBody,
+        },
       );
 
       console.log("[PayHere] SMS decision:", {
@@ -384,7 +458,7 @@ export async function POST(req: NextRequest) {
       status_code: body?.status_code,
     });
 
-    const isValid = payHereService.verifyNotificationHash(body);
+    const isValid = payHereService.verifyNotification(body);
 
     console.log("[PayHere] Webhook MD5 verification:", isValid);
 
@@ -451,6 +525,12 @@ export async function POST(req: NextRequest) {
       paymentId,
       statusCode,
       `PayHere Gateway IPN Callback (status_code ${statusCode})`,
+      {
+        merchantId: String(body.merchant_id),
+        amount: Number(body.payhere_amount),
+        currency: String(body.payhere_currency),
+        raw: body,
+      },
     );
 
     console.log("[PayHere] Booking payment result:", {

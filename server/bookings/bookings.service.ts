@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 ﻿import { Booking } from "../../lib/types";
 import { initialBookings, initialPlatformSettings } from "../../lib/mockData";
 
@@ -151,7 +152,8 @@ export class BookingsService {
     const netDoctor = fee - commission;
 
     const bookingId =
-      data.orderId || `BK-${Math.floor(10000 + Math.random() * 90000)}`;
+      data.orderId ||
+      `BK-${Date.now()}-${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 
     const now = new Date().toISOString();
 
@@ -226,6 +228,12 @@ export class BookingsService {
     payherePaymentId: string | null,
     statusCode: number | string,
     note?: string,
+    gateway?: {
+      merchantId?: string;
+      amount?: number | string;
+      currency?: string;
+      raw?: Record<string, any>;
+    },
   ): Promise<{
     success: boolean;
     statusText: "success" | "pending" | "failed";
@@ -262,6 +270,26 @@ export class BookingsService {
       );
     }
 
+    // Never confirm a payment for the wrong merchant, currency, or amount.
+    // The MD5 proves the notification came from PayHere; this check proves
+    // the notification also matches the booking we created.
+    if (gateway?.merchantId && gateway.merchantId !== process.env.PAYHERE_MERCHANT_ID) {
+      throw new Error("PayHere merchant ID does not match the configured merchant.");
+    }
+
+    if (gateway?.currency && gateway.currency !== "LKR") {
+      throw new Error(`Unsupported PayHere currency: ${gateway.currency}`);
+    }
+
+    if (gateway?.amount !== undefined) {
+      const paidAmount = Number(gateway.amount);
+      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - Number(booking.feeLkr)) > 0.01) {
+        throw new Error(
+          `PayHere amount mismatch for ${orderId}: expected ${Number(booking.feeLkr).toFixed(2)}, received ${String(gateway.amount)}`,
+        );
+      }
+    }
+
     // ==========================================================
     // SUCCESS
     // ==========================================================
@@ -284,6 +312,18 @@ export class BookingsService {
 
         payhereRef:
           payherePaymentId || booking.payhereRef || "PAYHERE-UNAVAILABLE",
+
+        gatewayResponse: gateway
+          ? {
+              merchantId: gateway.merchantId,
+              orderId,
+              payhereAmount: Number(gateway.amount),
+              payhereCurrency: gateway.currency,
+              statusCode: codeNum,
+              statusMessage: note,
+              raw: gateway.raw,
+            }
+          : booking.gatewayResponse,
 
         statusHistory: alreadyConfirmed
           ? booking.statusHistory
@@ -354,6 +394,18 @@ export class BookingsService {
         status: "pending",
         paymentStatus: "pending",
 
+        gatewayResponse: gateway
+          ? {
+              merchantId: gateway.merchantId,
+              orderId,
+              payhereAmount: Number(gateway.amount),
+              payhereCurrency: gateway.currency,
+              statusCode: codeNum,
+              statusMessage: note,
+              raw: gateway.raw,
+            }
+          : booking.gatewayResponse,
+
         statusHistory: [
           ...booking.statusHistory,
           {
@@ -399,6 +451,18 @@ export class BookingsService {
 
         status: "cancelled",
         paymentStatus: "failed",
+
+        gatewayResponse: gateway
+          ? {
+              merchantId: gateway.merchantId,
+              orderId,
+              payhereAmount: Number(gateway.amount),
+              payhereCurrency: gateway.currency,
+              statusCode: codeNum,
+              statusMessage: note,
+              raw: gateway.raw,
+            }
+          : booking.gatewayResponse,
 
         statusHistory: [
           ...booking.statusHistory,

@@ -203,43 +203,43 @@ export const PayHereCheckoutModal: React.FC<PayHereCheckoutModalProps> = ({
         );
       }
 
-      // 2. Call server simulate-notify endpoint to compute and verify real MD5 signature
-      const res = await fetch("/api/payments/payhere", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "simulate-notify",
-          orderId: orderId,
-          statusCode,
-          amount: doctor.feeLkr,
-        }),
-      });
+      // // 2. Call server simulate-notify endpoint to compute and verify real MD5 signature
+      // const res = await fetch("/api/payments/payhere", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     action: "simulate-notify",
+      //     orderId: orderId,
+      //     statusCode,
+      //     amount: doctor.feeLkr,
+      //   }),
+      // });
 
-      const data = await res.json();
-      if (!res.ok || !data.booking || data.booking.status !== "confirmed") {
-        throw new Error(
-          data.error || `PayHere Payment Declined (Status code: ${statusCode})`,
-        );
-      }
+      // const data = await res.json();
+      // if (!res.ok || !data.booking || data.booking.status !== "confirmed") {
+      //   throw new Error(
+      //     data.error || `PayHere Payment Declined (Status code: ${statusCode})`,
+      //   );
+      // }
 
-      // Ensure confirmed booking uses exact patientContact
-      const confirmedBooking: Booking = {
-        ...data.booking,
-        patientContact: formattedPhone,
-      };
+      // // Ensure confirmed booking uses exact patientContact
+      // const confirmedBooking: Booking = {
+      //   ...data.booking,
+      //   patientContact: formattedPhone,
+      // };
 
-      // Sync confirmed booking into local state store and update doctor slot
-      addConfirmedBooking(confirmedBooking);
+      // // Sync confirmed booking into local state store and update doctor slot
+      // addConfirmedBooking(confirmedBooking);
 
-      // Register or link patient account
-      registerPatient({
-        name: patientName.trim(),
-        email: patientEmail.trim(),
-        phone: formattedPhone,
-      });
+      // // Register or link patient account
+      // registerPatient({
+      //   name: patientName.trim(),
+      //   email: patientEmail.trim(),
+      //   phone: formattedPhone,
+      // });
 
-      onSuccess(confirmedBooking);
-      onClose();
+      // onSuccess(confirmedBooking);
+      // onClose();
     } catch (err: any) {
       setErrorMessage(
         err.message || "Payment processing failed on PayHere gateway",
@@ -329,30 +329,21 @@ export const PayHereCheckoutModal: React.FC<PayHereCheckoutModalProps> = ({
       console.log("✅ BOOKING CREATED SUCCESSFULLY");
       console.log("Booking ID:", bookingData.booking.id);
       console.log("➡️ CONTINUING TO PAYHERE...");
-      // 2. Fetch PayHere signed params
-      const nameParts = patientName.trim().split(" ");
-      const firstName = nameParts[0] || "Patient";
-      const lastName = nameParts.slice(1).join(" ") || "User";
 
-      const clientOrigin =
-        typeof window !== "undefined" ? window.location.origin : "";
+      // 2. Ask backend to create signed PayHere checkout parameters
       const paramRes = await fetch("/api/payments/payhere", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           action: "checkout-params",
-          baseUrl: clientOrigin,
-          orderId: orderId,
-          amount: doctor.feeLkr,
-          items: `Psychiatry Consultation - ${doctor.name}`,
-          firstName,
-          lastName,
-          email: patientEmail.trim(),
-          phone: formattedPhone,
+          bookingId: bookingData.booking.id,
         }),
       });
 
       const paramsBody = await paramRes.text();
+
       let params: any;
 
       try {
@@ -374,54 +365,12 @@ export const PayHereCheckoutModal: React.FC<PayHereCheckoutModalProps> = ({
         );
       }
 
-      if (!params.hash) {
-        throw new Error("Failed to generate PayHere signature hash");
+      if (!params.params) {
+        throw new Error("Backend did not return PayHere checkout parameters");
       }
 
       setCheckoutParams(params);
 
-      // Try PayHere JS SDK Popup first
-      if (typeof window !== "undefined" && (window as any).payhere) {
-        try {
-          const payhere = (window as any).payhere;
-          payhere.onCompleted = function onCompleted(completedOrderId: string) {
-            handleExecuteWebhookVerification(completedOrderId || orderId, 2); // Success
-          };
-          payhere.onDismissed = function onDismissed() {
-            setLoading(false);
-          };
-          payhere.onError = function onError(error: any) {
-            console.warn("PayHere SDK Error:", error);
-            // Fallback to submitting POST form
-            if (formRef.current) formRef.current.submit();
-          };
-
-          payhere.startPayment({
-            sandbox: params.sandbox,
-            merchant_id: params.merchant_id,
-            return_url: params.return_url,
-            cancel_url: params.cancel_url,
-            notify_url: params.notify_url,
-            order_id: params.order_id,
-            items: params.items,
-            amount: params.amount,
-            currency: params.currency,
-            hash: params.hash,
-            first_name: params.first_name,
-            last_name: params.last_name,
-            email: params.email,
-            phone: params.phone,
-            address: params.address || "Colombo",
-            city: params.city || "Colombo",
-            country: "Sri Lanka",
-          });
-          return;
-        } catch (sdkErr) {
-          console.warn("PayHere SDK launch notice:", sdkErr);
-        }
-      }
-
-      // Fallback: Submit HTML form
       setTimeout(() => {
         if (formRef.current) {
           formRef.current.submit();
@@ -665,68 +614,20 @@ export const PayHereCheckoutModal: React.FC<PayHereCheckoutModalProps> = ({
           <form
             ref={formRef}
             action={
-              checkoutParams.checkout_url ||
+              checkoutParams.checkoutUrl ||
               "https://sandbox.payhere.lk/pay/checkout"
             }
             method="POST"
             className="hidden"
           >
-            <input
-              type="hidden"
-              name="merchant_id"
-              value={checkoutParams.merchant_id}
-            />
-            <input
-              type="hidden"
-              name="return_url"
-              value={checkoutParams.return_url}
-            />
-            <input
-              type="hidden"
-              name="cancel_url"
-              value={checkoutParams.cancel_url}
-            />
-            <input
-              type="hidden"
-              name="notify_url"
-              value={checkoutParams.notify_url}
-            />
-            <input
-              type="hidden"
-              name="order_id"
-              value={checkoutParams.order_id}
-            />
-            <input type="hidden" name="items" value={checkoutParams.items} />
-            <input
-              type="hidden"
-              name="currency"
-              value={checkoutParams.currency}
-            />
-            <input type="hidden" name="amount" value={checkoutParams.amount} />
-            <input
-              type="hidden"
-              name="first_name"
-              value={checkoutParams.first_name}
-            />
-            <input
-              type="hidden"
-              name="last_name"
-              value={checkoutParams.last_name}
-            />
-            <input type="hidden" name="email" value={checkoutParams.email} />
-            <input type="hidden" name="phone" value={checkoutParams.phone} />
-            <input
-              type="hidden"
-              name="address"
-              value={checkoutParams.address}
-            />
-            <input type="hidden" name="city" value={checkoutParams.city} />
-            <input
-              type="hidden"
-              name="country"
-              value={checkoutParams.country}
-            />
-            <input type="hidden" name="hash" value={checkoutParams.hash} />
+            {Object.entries(checkoutParams.params).map(([key, value]) => (
+              <input
+                key={key}
+                type="hidden"
+                name={key}
+                value={String(value ?? "")}
+              />
+            ))}
           </form>
         )}
       </div>

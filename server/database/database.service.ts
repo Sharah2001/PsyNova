@@ -201,6 +201,8 @@ export class DatabaseService {
 
       payhereRef: entity.payhereRef || "",
 
+      gatewayResponse: entity.gatewayResponse ?? undefined,
+
       bookedBy: entity.bookedBy ?? undefined,
 
       videoLink: entity.videoLink ?? undefined,
