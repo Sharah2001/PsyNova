@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
+
 import * as crypto from "crypto";
 
 @Injectable()
@@ -10,6 +11,8 @@ export class PayHereService {
     process.env.PAYHERE_MODE?.toLowerCase() === "live" ? "live" : "sandbox";
 
   private readonly appUrl = process.env.APP_URL?.replace(/\/$/, "") || "";
+  private readonly publicAppUrl =
+    process.env.PUBLIC_APP_URL?.replace(/\/$/, "") || "";
 
   private get checkoutUrl() {
     return this.mode === "live"
@@ -66,6 +69,22 @@ export class PayHereService {
 
     const hash = this.generateHash(params.orderId, amount, currency);
 
+    console.log("[PayHere] ===== CHECKOUT DEBUG =====");
+    console.log("mode:", this.mode);
+    console.log("checkoutUrl:", this.checkoutUrl);
+    console.log("merchant_id:", this.merchantId);
+    console.log("order_id:", params.orderId);
+    console.log("amount:", amount);
+    console.log("currency:", currency);
+    console.log("hash:", hash);
+    console.log("return_url:", `${this.appUrl}/payment/success`);
+    console.log("cancel_url:", `${this.appUrl}/payment/cancel`);
+    console.log(
+      "notify_url:",
+      `${this.publicAppUrl}/api/payments/payhere/notify`,
+    );
+    console.log("[PayHere] =========================");
+
     return {
       checkoutUrl: this.checkoutUrl,
 
@@ -80,7 +99,7 @@ export class PayHereService {
           params.orderId,
         )}`,
 
-        notify_url: `${this.appUrl}/api/payments/payhere/notify`,
+        notify_url: `${this.publicAppUrl}/api/payments/payhere/notify`,
 
         first_name: params.firstName,
         last_name: params.lastName,
@@ -93,10 +112,8 @@ export class PayHereService {
 
         order_id: params.orderId,
         items: params.items,
-
         currency,
         amount,
-
         hash,
       },
     };
