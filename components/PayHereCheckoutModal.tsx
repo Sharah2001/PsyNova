@@ -180,6 +180,25 @@ export const PayHereCheckoutModal: React.FC<PayHereCheckoutModalProps> = ({
       const formattedPhone = phoneValidation.formatted || patientContact.trim();
 
       // 1. Create pending booking record first
+
+      console.log("========== SLOT TIME DEBUG ==========");
+      console.log("slot.datetime RAW:", slot.datetime);
+      console.log("slot.datetime ISO:", new Date(slot.datetime).toISOString());
+      console.log(
+        "slot.datetime Sri Lanka:",
+        new Date(slot.datetime).toLocaleString("en-LK", {
+          timeZone: "Asia/Colombo",
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      );
+      console.log("=====================================");
+
       const bookingRes = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

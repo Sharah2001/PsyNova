@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
-﻿import { Booking } from "../../lib/types";
+﻿import { randomUUID } from "crypto";
+import { Booking } from "../../lib/types";
 import { initialBookings, initialPlatformSettings } from "../../lib/mockData";
 
 import { PsychiatristsService } from "../psychiatrists/psychiatrists.service";
@@ -273,8 +273,13 @@ export class BookingsService {
     // Never confirm a payment for the wrong merchant, currency, or amount.
     // The MD5 proves the notification came from PayHere; this check proves
     // the notification also matches the booking we created.
-    if (gateway?.merchantId && gateway.merchantId !== process.env.PAYHERE_MERCHANT_ID) {
-      throw new Error("PayHere merchant ID does not match the configured merchant.");
+    if (
+      gateway?.merchantId &&
+      gateway.merchantId !== process.env.PAYHERE_MERCHANT_ID
+    ) {
+      throw new Error(
+        "PayHere merchant ID does not match the configured merchant.",
+      );
     }
 
     if (gateway?.currency && gateway.currency !== "LKR") {
@@ -283,7 +288,10 @@ export class BookingsService {
 
     if (gateway?.amount !== undefined) {
       const paidAmount = Number(gateway.amount);
-      if (!Number.isFinite(paidAmount) || Math.abs(paidAmount - Number(booking.feeLkr)) > 0.01) {
+      if (
+        !Number.isFinite(paidAmount) ||
+        Math.abs(paidAmount - Number(booking.feeLkr)) > 0.01
+      ) {
         throw new Error(
           `PayHere amount mismatch for ${orderId}: expected ${Number(booking.feeLkr).toFixed(2)}, received ${String(gateway.amount)}`,
         );
@@ -348,7 +356,9 @@ export class BookingsService {
         );
 
         const matchingSlot = doctor.upcomingSlots.find(
-          (s) => s.datetime === booking!.slotDatetime,
+          (s) =>
+            new Date(s.datetime).getTime() ===
+            new Date(booking!.slotDatetime).getTime(),
         );
 
         if (matchingSlot) {
@@ -666,10 +676,7 @@ export class BookingsService {
       ],
     };
 
-    this.bookings = [
-      updated,
-      ...this.bookings.filter((b) => b.id !== id),
-    ];
+    this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
 
     if (this.databaseService) {
       await this.databaseService.saveBooking(updated);
@@ -690,9 +697,7 @@ export class BookingsService {
     const booking = await this.findOne(id);
 
     if (booking.resolutionType !== "refund") {
-      throw new Error(
-        "This booking does not have a refund resolution.",
-      );
+      throw new Error("This booking does not have a refund resolution.");
     }
 
     if (booking.refundStatus !== "requested") {
@@ -722,10 +727,7 @@ export class BookingsService {
       ],
     };
 
-    this.bookings = [
-      updated,
-      ...this.bookings.filter((b) => b.id !== id),
-    ];
+    this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
 
     if (this.databaseService) {
       await this.databaseService.saveBooking(updated);
@@ -746,9 +748,7 @@ export class BookingsService {
     const booking = await this.findOne(id);
 
     if (booking.resolutionType !== "refund") {
-      throw new Error(
-        "This booking does not have a refund resolution.",
-      );
+      throw new Error("This booking does not have a refund resolution.");
     }
 
     if (booking.refundStatus !== "requested") {
@@ -771,17 +771,12 @@ export class BookingsService {
         {
           status: "cancelled",
           timestamp: now,
-          note:
-            note ||
-            `Refund rejected by admin ${adminId}.`,
+          note: note || `Refund rejected by admin ${adminId}.`,
         },
       ],
     };
 
-    this.bookings = [
-      updated,
-      ...this.bookings.filter((b) => b.id !== id),
-    ];
+    this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
 
     if (this.databaseService) {
       await this.databaseService.saveBooking(updated);
@@ -899,7 +894,7 @@ export class BookingsService {
     dispatchedCount: number;
     details: any[];
   }> {
-    // Always refresh from DB before scanning.
+    // Always refresh from PostgreSQL before scanning.
     if (this.databaseService) {
       try {
         this.bookings = await this.databaseService.getAllBookings();
@@ -910,7 +905,12 @@ export class BookingsService {
 
     const now = Date.now();
 
-    const fiveMinsMs = 5 * 60 * 1000;
+    // Reminder should be sent approximately 5 minutes
+    // before the consultation.
+    const fiveMinutesMs = 5 * 60 * 1000;
+
+    // Allow the scheduler a 1-minute execution window.
+    const windowMs = 60 * 1000;
 
     const details: any[] = [];
 
@@ -919,61 +919,113 @@ export class BookingsService {
     for (let i = 0; i < this.bookings.length; i++) {
       const booking = this.bookings[i];
 
+      // Only confirmed + successfully paid bookings
+      // are eligible for the reminder.
       if (
         booking.status !== "confirmed" ||
+        booking.paymentStatus !== "paid" ||
         booking.reminder5MinSent ||
         !booking.patientContact
       ) {
         continue;
       }
 
+      if (!booking.slotDatetime) {
+        console.warn(
+          `[Reminder Scanner] Booking ${booking.id} has no slotDatetime.`,
+        );
+        continue;
+      }
+
       const slotTime = new Date(booking.slotDatetime).getTime();
+
+      if (!Number.isFinite(slotTime)) {
+        console.error(
+          `[Reminder Scanner] Invalid slotDatetime for ${booking.id}:`,
+          booking.slotDatetime,
+        );
+        continue;
+      }
 
       const diff = slotTime - now;
 
-      if (diff > -15 * 60 * 1000 && diff <= fiveMinsMs) {
-        try {
-          const smsRes = await smsService.send5MinReminder(booking);
+      // Target:
+      //
+      // appointment - now ≈ 5 minutes
+      //
+      // Accept approximately:
+      // 4 minutes → 6 minutes
+      //
+      if (diff < fiveMinutesMs - windowMs || diff > fiveMinutesMs + windowMs) {
+        continue;
+      }
 
-          if (!smsRes?.success || smsRes.status !== "DELIVERED") {
-            details.push({
-              bookingId: booking.id,
-              patient: booking.patientName,
-              recipient: booking.patientContact,
-              res: smsRes,
-            });
+      console.log(
+        `[Automated 5-Min Reminder] Sending reminder for ${booking.id}`,
+      );
 
-            continue;
-          }
+      console.log(
+        `[Automated 5-Min Reminder] slotDatetime: ${booking.slotDatetime}`,
+      );
 
-          const updated: Booking = {
-            ...booking,
+      console.log(
+        `[Automated 5-Min Reminder] minutes until session: ${diff / 60000}`,
+      );
 
-            reminder5MinSent: true,
+      try {
+        const smsRes = await smsService.send5MinReminder(booking);
 
-            reminder5MinSentAt: new Date().toISOString(),
-          };
-
-          this.bookings[i] = updated;
-
-          if (this.databaseService) {
-            await this.databaseService.saveBooking(updated);
-          }
-
-          count++;
-
+        if (!smsRes?.success || smsRes.status !== "DELIVERED") {
           details.push({
             bookingId: booking.id,
             patient: booking.patientName,
             recipient: booking.patientContact,
+            success: false,
             res: smsRes,
           });
-        } catch (error) {
-          console.error(
-            `[Automated 5-Min Reminder] Error sending for ${booking.id}:`,
-            error,
-          );
+
+          continue;
         }
+
+        const updated: Booking = {
+          ...booking,
+
+          reminder5MinSent: true,
+
+          reminder5MinSentAt: new Date().toISOString(),
+        };
+
+        this.bookings[i] = updated;
+
+        if (this.databaseService) {
+          const saved = await this.databaseService.saveBooking(updated);
+
+          if (!saved) {
+            console.error(
+              `[Automated 5-Min Reminder] Failed to save reminder flag for ${booking.id}`,
+            );
+            continue;
+          }
+        }
+
+        count++;
+
+        details.push({
+          bookingId: booking.id,
+          patient: booking.patientName,
+          recipient: booking.patientContact,
+          success: true,
+          res: smsRes,
+        });
+
+        console.log(
+          `[Automated 5-Min Reminder] Successfully sent for ${booking.id}`,
+        );
+      } catch (error) {
+        console.error(
+          `[Automated 5-Min Reminder] Error sending for ${booking.id}:`,
+          error,
+        );
       }
     }
 
@@ -983,6 +1035,3 @@ export class BookingsService {
     };
   }
 }
-
-
-

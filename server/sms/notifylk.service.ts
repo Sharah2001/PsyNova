@@ -262,6 +262,7 @@ export class NotifyLkService {
     const formattedDate = new Date(booking.slotDatetime).toLocaleString(
       "en-US",
       {
+        timeZone: "Asia/Colombo",
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -269,6 +270,9 @@ export class NotifyLkService {
         minute: "2-digit",
       },
     );
+
+    // rest of your existing code...
+
     const recipient = booking.patientContact;
     if (!recipient) {
       console.warn(
