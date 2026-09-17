@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
@@ -122,6 +123,7 @@ export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
 
   const orderId = searchParams.get("order_id");
+  const isBoostOrder = orderId?.startsWith("BOOST|") ?? false;
 
   const [booking, setBooking] = useState<Booking | null>(null);
   const [pageState, setPageState] = useState<PageState>("loading");
@@ -246,6 +248,40 @@ export default function PaymentSuccessPage() {
    * LOADING
    * ------------------------------------------------------------
    */
+
+  if (isBoostOrder) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-12">
+        <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-slate-900">
+              Boost payment confirmed
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Your doctor profile boost payment was successfully processed and
+              the spotlight placement is now active.
+            </p>
+
+            <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+              Reference: {orderId}
+            </p>
+
+            <Link
+              href="/?tab=psychiatrists"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Back to doctors
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (pageState === "loading") {
     return (
@@ -651,13 +687,13 @@ export default function PaymentSuccessPage() {
               Print / Save Receipt
             </button>
 
-            <a
+            <Link
               href="/"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
               Continue to PsyNova
               <ArrowRight className="h-4 w-4" />
-            </a>
+            </Link>
           </div>
 
           <p className="mt-6 text-center text-xs leading-5 text-slate-400 print:hidden">

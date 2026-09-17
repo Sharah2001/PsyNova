@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     console.log("Content-Type:", req.headers.get("content-type"));
     console.log("========================================");
 
-    const { payHereService, bookingsService } = await getNestServices();
+    const { payHereService, bookingsService, psychiatristsService } =
+      await getNestServices();
 
     let body: Record<string, any> = {};
 
@@ -179,6 +180,33 @@ export async function POST(req: NextRequest) {
      * The booking service performs the final database
      * validation and confirmation.
      */
+    if (orderId.startsWith("BOOST|")) {
+      const [, doctorId, tier] = orderId.split("|");
+      const normalizedTier = tier === "3-day" ? "3-day" : "1-day";
+
+      if (!doctorId) {
+        return NextResponse.json(
+          { ok: false, error: "Boost order is missing doctorId" },
+          { status: 400 },
+        );
+      }
+
+      const boostResult = psychiatristsService.boost(
+        doctorId,
+        normalizedTier as any,
+      );
+
+      return NextResponse.json({
+        ok: true,
+        verified: true,
+        orderId,
+        statusCode: numericStatus,
+        paymentId,
+        type: "boost",
+        result: boostResult,
+      });
+    }
+
     const result = await bookingsService.verifyAndConfirmPayHerePayment(
       orderId,
       paymentId || `PAYHERE-${orderId}`,

@@ -116,6 +116,7 @@ export interface Booking {
   patientContact: string;
   doctorId: string;
   doctorName: string;
+  slotId: string;
   doctorPhoto?: string;
   slotDatetime: string;
   feeLkr: number;

@@ -13,7 +13,12 @@ export function isDashboardBooking(booking: Booking): boolean {
     "payout_completed",
   ].includes(booking.paymentStatus);
 
-  return paymentConfirmed && booking.confirmationSmsSent === true;
+  const statusVisible = ["confirmed", "completed"].includes(booking.status);
+
+  return (
+    (paymentConfirmed || statusVisible) &&
+    !["pending", "cancelled", "expired"].includes(booking.status)
+  );
 }
 
 export function validateEmail(email: string): {

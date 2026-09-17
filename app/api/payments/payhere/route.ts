@@ -127,6 +127,65 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "checkout-params") {
+      const type = String(body.type || "booking").toLowerCase();
+
+      if (type === "boost") {
+        const { psychiatristsService } = await getNestServices();
+        const doctorId = String(body.doctorId || "").trim();
+        const tier = String(body.tier || "1-day").trim();
+        const normalizedTier = tier === "3-day" ? "3-day" : "1-day";
+
+        if (!doctorId) {
+          return NextResponse.json(
+            { error: "doctorId is required for boost payments" },
+            { status: 400 },
+          );
+        }
+
+        const doctor = psychiatristsService.findOne(doctorId);
+        const amount = normalizedTier === "3-day" ? 1400 : 500;
+        const orderId = String(
+          body.orderId || `BOOST|${doctorId}|${normalizedTier}|${Date.now()}`,
+        ).trim();
+
+        const appUrl = process.env.APP_URL?.trim() || "";
+        if (!appUrl) {
+          return NextResponse.json(
+            { error: "APP_URL is not configured on the server." },
+            { status: 500 },
+          );
+        }
+
+        const fullName = String(
+          body.customerName || doctor.name || "Doctor",
+        ).trim();
+        const nameParts = fullName.split(/\s+/).filter(Boolean);
+        const firstName = nameParts.shift() || "Doctor";
+        const lastName = nameParts.join(" ") || "Profile";
+
+        const params = payHereService.createCheckoutParams({
+          orderId,
+          amount,
+          firstName,
+          lastName,
+          email: String(body.customerEmail || "doctor@psynova.lk").trim(),
+          phone: String(body.customerPhone || "").trim(),
+          address: "Sri Lanka",
+          city: "Colombo",
+          items: `Doctor Profile Boost - ${doctor.name} (${normalizedTier})`,
+          currency: "LKR",
+        });
+
+        return NextResponse.json({
+          checkoutUrl: params.checkoutUrl,
+          params: params.params,
+          type: "boost",
+          orderId,
+          amount,
+          tier: normalizedTier,
+        });
+      }
+
       /*
        * ------------------------------------------------------------
        * SECURITY:

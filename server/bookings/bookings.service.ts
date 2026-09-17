@@ -143,6 +143,27 @@ export class BookingsService {
       throw new Error("This consultation slot is no longer available.");
     }
 
+    // ============================================================
+    // IMPORTANT:
+    // Check PostgreSQL bookings as the real source of truth.
+    // This prevents double booking even when the psychiatrist
+    // JSONB slot status is stale.
+    // ============================================================
+
+    if (this.databaseService) {
+      const alreadyBooked = await this.databaseService.isSlotBooked(
+        doctor.id,
+        data.slotId,
+        data.slotDatetime,
+      );
+
+      if (alreadyBooked) {
+        throw new Error(
+          "This consultation slot has already been booked. Please select another slot.",
+        );
+      }
+    }
+
     const fee = doctor.feeLkr;
 
     const commission = Math.round(
@@ -169,6 +190,7 @@ export class BookingsService {
       doctorName: doctor.name,
       doctorPhoto: doctor.photo,
 
+      slotId: data.slotId,
       slotDatetime: data.slotDatetime,
 
       feeLkr: fee,
@@ -207,6 +229,12 @@ export class BookingsService {
 
     if (this.databaseService) {
       const saved = await this.databaseService.saveBooking(pendingBooking);
+      // Reserve the slot immediately while payment is being processed.
+      try {
+        this.psychiatristsService.markSlotBooked(doctor.id, data.slotId);
+      } catch (error) {
+        console.warn("[Booking] Could not mark slot as booked:", error);
+      }
 
       if (!saved) {
         throw new Error("Booking could not be saved to PostgreSQL.");
@@ -356,9 +384,7 @@ export class BookingsService {
         );
 
         const matchingSlot = doctor.upcomingSlots.find(
-          (s) =>
-            new Date(s.datetime).getTime() ===
-            new Date(booking!.slotDatetime).getTime(),
+          (s) => s.id === booking!.slotId,
         );
 
         if (matchingSlot) {
@@ -564,6 +590,7 @@ export class BookingsService {
       doctorName: doctor.name,
       doctorPhoto: doctor.photo,
 
+      slotId: data.slotId,
       slotDatetime: data.slotDatetime,
 
       feeLkr: fee,
@@ -617,47 +644,93 @@ export class BookingsService {
   }
 
   // ============================================================
-  // DOCTOR CANCELS BOOKING + REQUESTS RESOLUTION
+  // GENERIC CANCELLATION FLOW
+  // Patient cancellations are never refund-claiming.
+  // Admin and doctor cancellations may request a refund or reschedule.
   // ============================================================
 
-  async cancelBookingByDoctor(
+  async cancelBooking(
     id: string,
-    resolutionType: "reschedule" | "refund",
+    actor: "PATIENT" | "DOCTOR" | "ADMIN" = "PATIENT",
+    resolutionType: "none" | "reschedule" | "refund" = "none",
     note?: string,
   ): Promise<Booking> {
     const booking = await this.findOne(id);
 
-    if (booking.status !== "confirmed") {
-      throw new Error(
-        "Only confirmed bookings can be cancelled by the doctor.",
-      );
+    if (booking.status !== "confirmed" && booking.status !== "pending") {
+      throw new Error("Only confirmed or pending bookings can be cancelled.");
     }
 
     const now = new Date().toISOString();
 
+    if (actor === "PATIENT") {
+      if (resolutionType !== "none") {
+        throw new Error(
+          "Patients cannot request a refund or reschedule while cancelling a booking.",
+        );
+      }
+
+      const updated: Booking = {
+        ...booking,
+        status: "cancelled",
+        cancelledBy: "PATIENT",
+        cancellationReason: note || "Cancelled by patient.",
+        cancelledAt: now,
+        resolutionType: "none",
+        refundStatus: "none",
+        refundRequestedBy: undefined,
+        refundRequestedAt: undefined,
+        refundAmount: undefined,
+        statusHistory: [
+          ...booking.statusHistory,
+          {
+            status: "cancelled",
+            timestamp: now,
+            note: note || "Cancelled by patient. No refund requested.",
+          },
+        ],
+      };
+
+      this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
+
+      if (this.databaseService) {
+        await this.databaseService.saveBooking(updated);
+      }
+
+      return updated;
+    }
+
+    if (actor !== "DOCTOR" && actor !== "ADMIN") {
+      throw new Error("Invalid cancellation actor.");
+    }
+
+    const resolvedType = resolutionType || "none";
+
     const updated: Booking = {
       ...booking,
-
       status: "cancelled",
-
-      cancelledBy: "DOCTOR",
-      cancellationReason: note || "Session cancelled by doctor.",
+      cancelledBy: actor,
+      cancellationReason:
+        note ||
+        (actor === "DOCTOR"
+          ? "Session cancelled by doctor."
+          : "Session cancelled by admin."),
       cancelledAt: now,
+      resolutionType: resolvedType,
 
-      resolutionType,
-
-      ...(resolutionType === "reschedule"
+      ...(resolvedType === "reschedule"
         ? {
             rescheduleRequestedAt: now,
-            rescheduleRequestedBy: booking.doctorId,
+            rescheduleRequestedBy:
+              actor === "DOCTOR" ? booking.doctorId : "admin",
             rescheduleStatus: "pending_patient" as const,
           }
         : {}),
 
-      ...(resolutionType === "refund"
+      ...(resolvedType === "refund"
         ? {
             refundStatus: "requested" as const,
-            refundRequestedBy: booking.doctorId,
+            refundRequestedBy: actor === "ADMIN" ? "admin" : booking.doctorId,
             refundRequestedAt: now,
             refundAmount: booking.feeLkr,
           }
@@ -669,9 +742,11 @@ export class BookingsService {
           status: "cancelled",
           timestamp: now,
           note:
-            resolutionType === "reschedule"
-              ? "Cancelled by doctor. Reschedule requested; waiting for patient acceptance."
-              : "Cancelled by doctor. Refund requested; waiting for admin approval.",
+            resolvedType === "reschedule"
+              ? `${actor} cancelled the session. Reschedule requested; waiting for patient acceptance.`
+              : resolvedType === "refund"
+                ? `${actor} cancelled the session. Refund requested; waiting for admin approval.`
+                : `${actor} cancelled the session.`,
         },
       ],
     };
@@ -683,6 +758,22 @@ export class BookingsService {
     }
 
     return updated;
+  }
+
+  async cancelBookingByDoctor(
+    id: string,
+    resolutionType: "none" | "reschedule" | "refund" = "none",
+    note?: string,
+  ): Promise<Booking> {
+    return this.cancelBooking(id, "DOCTOR", resolutionType, note);
+  }
+
+  async cancelBookingByAdmin(
+    id: string,
+    resolutionType: "none" | "reschedule" | "refund" = "none",
+    note?: string,
+  ): Promise<Booking> {
+    return this.cancelBooking(id, "ADMIN", resolutionType, note);
   }
 
   // ============================================================
@@ -921,10 +1012,13 @@ export class BookingsService {
 
       // Only confirmed + successfully paid bookings
       // are eligible for the reminder.
+      const reminderAlreadySent =
+        !!booking.reminder5MinSent || !!booking.reminder5MinSentAt;
+
       if (
         booking.status !== "confirmed" ||
         booking.paymentStatus !== "paid" ||
-        booking.reminder5MinSent ||
+        reminderAlreadySent ||
         !booking.patientContact
       ) {
         continue;
@@ -949,33 +1043,38 @@ export class BookingsService {
 
       const diff = slotTime - now;
 
-      // Target:
-      //
-      // appointment - now ≈ 5 minutes
-      //
-      // Accept approximately:
-      // 4 minutes → 6 minutes
-      //
-      if (diff < fiveMinutesMs - windowMs || diff > fiveMinutesMs + windowMs) {
+      // Send only once, and only in the final 5 minutes before the session.
+      if (diff <= 0 || diff > fiveMinutesMs) {
         continue;
+      }
+
+      const updated: Booking = {
+        ...booking,
+        reminder5MinSent: true,
+        reminder5MinSentAt: new Date().toISOString(),
+      };
+
+      this.bookings[i] = updated;
+
+      if (this.databaseService) {
+        const saved = await this.databaseService.saveBooking(updated);
+        if (!saved) {
+          console.error(
+            `[Automated 5-Min Reminder] Failed to save reminder flag for ${booking.id}`,
+          );
+        }
       }
 
       console.log(
         `[Automated 5-Min Reminder] Sending reminder for ${booking.id}`,
       );
 
-      console.log(
-        `[Automated 5-Min Reminder] slotDatetime: ${booking.slotDatetime}`,
-      );
-
-      console.log(
-        `[Automated 5-Min Reminder] minutes until session: ${diff / 60000}`,
-      );
-
       try {
         const smsRes = await smsService.send5MinReminder(booking);
 
-        if (!smsRes?.success || smsRes.status !== "DELIVERED") {
+        const success = !!smsRes?.success || smsRes?.status === "DELIVERED";
+
+        if (!success) {
           details.push({
             bookingId: booking.id,
             patient: booking.patientName,
@@ -984,28 +1083,11 @@ export class BookingsService {
             res: smsRes,
           });
 
+          console.warn(
+            `[Automated 5-Min Reminder] Triggered reminder for ${booking.id}, but gateway response was not confirmed:`,
+            smsRes?.error || smsRes?.log?.errorNote || smsRes,
+          );
           continue;
-        }
-
-        const updated: Booking = {
-          ...booking,
-
-          reminder5MinSent: true,
-
-          reminder5MinSentAt: new Date().toISOString(),
-        };
-
-        this.bookings[i] = updated;
-
-        if (this.databaseService) {
-          const saved = await this.databaseService.saveBooking(updated);
-
-          if (!saved) {
-            console.error(
-              `[Automated 5-Min Reminder] Failed to save reminder flag for ${booking.id}`,
-            );
-            continue;
-          }
         }
 
         count++;

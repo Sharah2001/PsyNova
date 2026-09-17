@@ -37,6 +37,7 @@ interface PsyNovaContextType {
   psychiatrists: Psychiatrist[];
   bookings: Booking[];
   refreshBookings: () => Promise<void>;
+  refreshPsychiatrists: () => Promise<void>;
   reviews: Review[];
   complaints: Complaint[];
   platformSettings: PlatformSettings;
@@ -360,6 +361,53 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
     // Keep existing bookings during brief API/server restarts.
   };
 
+  const refreshPsychiatrists = async (): Promise<void> => {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await fetch("/api/psychiatrists", {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(
+            `Failed to load psychiatrists: HTTP ${response.status}${errorBody ? ` - ${errorBody}` : ""}`,
+          );
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          console.error("[PsyNova] Invalid psychiatrists API response:", data);
+          return;
+        }
+
+        setPsychiatrists(data);
+        console.log(
+          `[PsyNova] Refreshed ${data.length} psychiatrist slot lists.`,
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+        }
+      }
+    }
+
+    console.error(
+      "[PsyNova] Psychiatrist refresh failed after 3 attempts:",
+      lastError,
+    );
+  };
+
   useEffect(() => {
     if (!isStoreInitialized) return;
 
@@ -369,20 +417,22 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!mounted) return;
 
       try {
-        await refreshBookings();
+        await Promise.all([refreshBookings(), refreshPsychiatrists()]);
       } catch (error) {
         console.error(
-          "[PsyNova] Automatic booking synchronization failed:",
+          "[PsyNova] Automatic availability synchronization failed:",
           error,
         );
       }
     };
 
     // Refresh immediately after initial store loading
-    syncBookings();
+    void syncBookings();
 
-    // Refresh every 5 seconds
-    const interval = setInterval(syncBookings, 5000);
+    // Refresh every 5 seconds so booked slots disappear for other users instantly.
+    const interval = setInterval(() => {
+      void syncBookings();
+    }, 5000);
 
     return () => {
       mounted = false;
@@ -568,66 +618,8 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
     patients,
   ]);
 
-  // Automated 5-minute pre-session SMS reminder scanner & background sync
-  useEffect(() => {
-    const scanAndDispatchReminders = async () => {
-      const now = Date.now();
-      const fiveMinsMs = 5 * 60 * 1000;
-
-      for (const booking of bookings) {
-        if (
-          booking.status === "confirmed" &&
-          !booking.reminder5MinSent &&
-          booking.patientContact
-        ) {
-          const slotTime = new Date(booking.slotDatetime).getTime();
-          const diff = slotTime - now;
-
-          // If session starts in <= 5 mins (and hasn't passed more than 15 mins)
-          if (diff > -15 * 60 * 1000 && diff <= fiveMinsMs) {
-            try {
-              console.log(
-                `[Auto-Trigger] Dispatching 5-minute pre-session reminder SMS for Booking ${booking.id} to ${booking.patientContact}`,
-              );
-              const res = await fetch("/api/sms", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "reminder-5min", booking }),
-              });
-              const data = await res.json();
-              console.log("[Auto-Trigger] 5-min Reminder response:", data);
-
-              if (res.ok && data.success && data.status === "DELIVERED") {
-                const sentAt = new Date().toISOString();
-                setBookings((prev) =>
-                  prev.map((b) =>
-                    b.id === booking.id
-                      ? {
-                          ...b,
-                          reminder5MinSent: true,
-                          reminder5MinSentAt: sentAt,
-                        }
-                      : b,
-                  ),
-                );
-              } else {
-                console.warn(
-                  "[Auto-Trigger] Reminder was not delivered:",
-                  data.error || data.log?.errorNote,
-                );
-              }
-            } catch (e) {
-              console.error("Automated 5-min SMS reminder error:", e);
-            }
-          }
-        }
-      }
-    };
-
-    const interval = setInterval(scanAndDispatchReminders, 10000);
-    scanAndDispatchReminders();
-    return () => clearInterval(interval);
-  }, [bookings]);
+  // Reminder dispatch is handled server-side by the booking reminder scanner.
+  // Keeping the client out of this loop avoids duplicate 5-minute reminders.
 
   // Handle role selection
   const setUserRole = (role: UserRole) => {
@@ -698,35 +690,55 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     }
 
-    const daysToAdd = tier === "1-day" ? 1 : 3;
-    const expiry = new Date(
-      Date.now() + daysToAdd * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const normalizedTier = tier === "3-day" ? "3-day" : "1-day";
+    const amount = normalizedTier === "3-day" ? 1400 : 500;
+    const orderId = `BOOST|${doctorId}|${normalizedTier}|${Date.now()}`;
 
-    setPsychiatrists((prev) =>
-      prev.map((doc) => {
-        if (doc.id === doctorId) {
-          return {
-            ...doc,
-            isBoosted: true,
-            boostTier: tier,
-            boostExpiry: expiry,
-          };
-        }
-        return doc;
-      }),
-    );
-
-    // Sync to NestJS backend
-    fetch("/api/psychiatrists", {
+    fetch("/api/payments/payhere", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "boost", doctorId, tier }),
-    }).catch((e) => console.error("NestJS sync error:", e));
+      body: JSON.stringify({
+        action: "checkout-params",
+        type: "boost",
+        doctorId,
+        tier: normalizedTier,
+        orderId,
+        amount,
+        customerName: user.name || "Doctor",
+        customerEmail: user.email || "doctor@psynova.lk",
+        customerPhone: "",
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok || !data?.checkoutUrl || !data?.params) {
+          throw new Error(data?.error || "Failed to initialize boost payment");
+        }
+
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = data.checkoutUrl;
+
+        Object.entries(data.params).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = String(key);
+          input.value = String(value ?? "");
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+      })
+      .catch((error) => {
+        console.error("Boost payment initialization failed:", error);
+      });
 
     return {
       success: true,
-      message: `Doctor successfully boosted with ${tier} package!`,
+      message: `Redirecting to PayHere for the ${normalizedTier} profile boost payment of LKR ${amount.toLocaleString()}.`,
     };
   };
 
@@ -852,17 +864,59 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       status: "available";
     },
   ) => {
+    // Update frontend immediately
     setPsychiatrists((prev) =>
       prev.map((doc) => {
-        if (doc.id === doctorId) {
-          return {
-            ...doc,
-            upcomingSlots: [slot, ...doc.upcomingSlots],
-          };
-        }
-        return doc;
+        if (doc.id !== doctorId) return doc;
+
+        return {
+          ...doc,
+          upcomingSlots: [slot, ...doc.upcomingSlots],
+        };
       }),
     );
+
+    // Persist the slot to PostgreSQL
+    fetch("/api/psychiatrists", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "add-slot",
+        doctorId,
+        slot,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to save doctor slot");
+        }
+
+        console.log(
+          `[PsyNova] Slot ${slot.id} saved for doctor ${doctorId}`,
+          data,
+        );
+      })
+      .catch((error) => {
+        console.error("[PsyNova] Failed to save doctor slot:", error);
+
+        // Roll back frontend state if PostgreSQL save failed
+        setPsychiatrists((prev) =>
+          prev.map((doc) => {
+            if (doc.id !== doctorId) return doc;
+
+            return {
+              ...doc,
+              upcomingSlots: doc.upcomingSlots.filter(
+                (existingSlot) => existingSlot.id !== slot.id,
+              ),
+            };
+          }),
+        );
+      });
   };
 
   // Create Booking wrapped in slot checking
@@ -900,6 +954,7 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       patientContact: data.patientContact,
       doctorId: doctor.id,
       doctorName: doctor.name,
+      slotId: data.slotId,
       doctorPhoto: doctor.photo,
       slotDatetime: data.slotDatetime,
       feeLkr: fee,
@@ -928,7 +983,8 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       ],
     };
 
-    // Mark slot as booked
+    // Mark slot as booked immediately and refresh from server so it disappears
+    // for concurrent users before the payment confirmation completes.
     setPsychiatrists((prev) =>
       prev.map((d) => {
         if (d.id === doctor.id) {
@@ -942,6 +998,12 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
         return d;
       }),
     );
+    void refreshPsychiatrists();
+
+    setBookings((prev) => [
+      newBooking,
+      ...prev.filter((existing) => existing.id !== newBooking.id),
+    ]);
 
     // Ensure patient is in registered patients list
     registerPatient({
@@ -1011,6 +1073,11 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
       confirmationSmsSent: false,
     };
 
+    setBookings((prev) => [
+      bookingWithSmsMeta,
+      ...prev.filter((existing) => existing.id !== bookingWithSmsMeta.id),
+    ]);
+
     if (booking.doctorId) {
       setPsychiatrists((prev) =>
         prev.map((d) => {
@@ -1027,6 +1094,7 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
           return d;
         }),
       );
+      void refreshPsychiatrists();
     }
 
     // Automatically fire SMS confirmation to patient phone number if not already fired
@@ -1079,25 +1147,38 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const cancelBooking = (bookingId: string, note?: string) => {
-    setBookings((prev) =>
-      prev.map((b) => {
-        if (b.id === bookingId) {
-          return {
-            ...b,
-            status: "cancelled",
-            statusHistory: [
-              ...b.statusHistory,
-              {
-                status: "cancelled",
-                timestamp: new Date().toISOString(),
-                note: note || "Cancelled by user/admin",
-              },
-            ],
-          };
-        }
-        return b;
+    const actor =
+      user.role === "admin"
+        ? "ADMIN"
+        : user.role === "psychiatrist"
+          ? "DOCTOR"
+          : "PATIENT";
+
+    const resolutionType = actor === "PATIENT" ? "none" : "refund";
+
+    fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "cancel",
+        bookingId,
+        actor,
+        resolutionType,
+        note: note || "Cancelled by user/admin",
       }),
-    );
+    })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to cancel booking");
+        }
+
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? data : b)));
+      })
+      .catch((error) => {
+        console.error("Booking cancellation failed:", error);
+      });
   };
 
   const completeBooking = (bookingId: string) => {
@@ -1284,6 +1365,7 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
         setShowRoleSelector,
         psychiatrists,
         bookings,
+        refreshPsychiatrists,
         reviews,
         complaints,
         platformSettings,

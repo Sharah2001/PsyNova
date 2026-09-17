@@ -134,6 +134,7 @@ export class DatabaseService {
       patientEmail: entity.patientEmail,
       patientContact: entity.patientContact,
 
+      slotId: entity.slotId,
       slotDatetime: entity.slotDatetime,
 
       feeLkr: Number(entity.feeLkr ?? 0),
@@ -289,6 +290,69 @@ export class DatabaseService {
         `[DatabaseService] Failed to load bookings: ${error.message}`,
       );
 
+      throw error;
+    }
+  }
+
+  async getBookedSlotIdsForDoctor(doctorId: string): Promise<string[]> {
+    const ds = await this.getDataSource();
+    const repository = ds.getRepository(BookingEntity);
+
+    const bookings = await repository.find({
+      where: {
+        doctorId,
+        paymentStatus: "paid",
+      },
+      select: { slotId: true },
+    });
+
+    return bookings
+      .map((booking) => booking.slotId)
+      .filter((slotId): slotId is string => Boolean(slotId));
+  }
+
+  // ============================================================
+  // CHECK SLOT OCCUPANCY
+  // PostgreSQL bookings are the source of truth.
+  // ============================================================
+
+  async isSlotBooked(
+    doctorId: string,
+    slotId: string,
+    slotDatetime?: string,
+  ): Promise<boolean> {
+    try {
+      const ds = await this.getDataSource();
+
+      const repository = ds.getRepository(BookingEntity);
+
+      const query = repository
+        .createQueryBuilder("booking")
+        .where("booking.doctor_id = :doctorId", { doctorId })
+        .andWhere("booking.slot_id = :slotId", { slotId })
+        .andWhere("booking.status IN (:...statuses)", {
+          statuses: ["pending", "confirmed", "completed"],
+        });
+
+      // Also verify datetime when supplied.
+      // This protects against accidental reuse of a slot ID.
+      if (slotDatetime) {
+        query.andWhere("booking.slot_datetime = :slotDatetime", {
+          slotDatetime,
+        });
+      }
+
+      const booking = await query.getOne();
+
+      return !!booking;
+    } catch (error: any) {
+      this.logger.error(
+        `[Slot Availability] Failed to check slot ${slotId}: ${error.message}`,
+      );
+
+      // IMPORTANT:
+      // Do not accidentally expose a potentially booked slot
+      // if PostgreSQL availability checking fails.
       throw error;
     }
   }

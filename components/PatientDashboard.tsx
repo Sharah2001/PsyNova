@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { usePsyNova } from '@/lib/store';
-import { Booking } from '@/lib/types';
-import { JitsiVideoModal } from '@/components/JitsiVideoModal';
+import React, { useState } from "react";
+import { usePsyNova } from "@/lib/store";
+import { Booking } from "@/lib/types";
+import { JitsiVideoModal } from "@/components/JitsiVideoModal";
 import {
   UserCheck,
   Calendar,
@@ -15,32 +15,47 @@ import {
   CheckCircle2,
   XCircle,
   PlusCircle,
-  X
-} from 'lucide-react';
+  X,
+} from "lucide-react";
 
 interface PatientDashboardProps {
   setActiveTab: (tab: string) => void;
 }
 
-export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab }) => {
-  const { user, bookings, addComplaint, deactivatePatientAccount, addReview } = usePsyNova();
+export const PatientDashboard: React.FC<PatientDashboardProps> = ({
+  setActiveTab,
+}) => {
+  const {
+    user,
+    bookings,
+    addComplaint,
+    deactivatePatientAccount,
+    addReview,
+    cancelBooking,
+  } = usePsyNova();
 
   // Filter bookings belonging to current patient
-  const myBookings = bookings.filter((b) => b.patientId === user.id || b.patientEmail === user.email);
+  const myBookings = bookings.filter(
+    (b) => b.patientId === user.id || b.patientEmail === user.email,
+  );
 
   // Modal states for Complaint submission & Review submission
-  const [complaintBooking, setComplaintBooking] = useState<Booking | null>(null);
-  const [complaintReason, setComplaintReason] = useState('');
-  const [complaintDetails, setComplaintDetails] = useState('');
+  const [complaintBooking, setComplaintBooking] = useState<Booking | null>(
+    null,
+  );
+  const [complaintReason, setComplaintReason] = useState("");
+  const [complaintDetails, setComplaintDetails] = useState("");
   const [complaintSubmitted, setComplaintSubmitted] = useState(false);
 
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
   const [reviewRating, setReviewRating] = useState<number>(5);
-  const [reviewText, setReviewText] = useState('');
+  const [reviewText, setReviewText] = useState("");
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   // Jitsi Video Modal State
-  const [activeJitsiBooking, setActiveJitsiBooking] = useState<Booking | null>(null);
+  const [activeJitsiBooking, setActiveJitsiBooking] = useState<Booking | null>(
+    null,
+  );
 
   // Deactivation confirmation modal
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
@@ -53,8 +68,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
     setTimeout(() => {
       setComplaintSubmitted(false);
       setComplaintBooking(null);
-      setComplaintReason('');
-      setComplaintDetails('');
+      setComplaintReason("");
+      setComplaintDetails("");
     }, 1800);
   };
 
@@ -66,7 +81,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
     setTimeout(() => {
       setReviewSubmitted(false);
       setReviewBooking(null);
-      setReviewText('');
+      setReviewText("");
     }, 1800);
   };
 
@@ -82,10 +97,12 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-[#2D3728]">{user.name}</h1>
               <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-[#768c6e]/15 text-[#6B7D5E]">
-                Client ID: {user.clientId || 'Unassigned'}
+                Client ID: {user.clientId || "Unassigned"}
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-[#2D3728]/70 mt-0.5">{user.email} • Private Patient Portal</p>
+            <p className="text-xs sm:text-sm text-[#2D3728]/70 mt-0.5">
+              {user.email} • Private Patient Portal
+            </p>
           </div>
         </div>
 
@@ -101,16 +118,21 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
       {user.deactivatedAt && (
         <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 text-xs flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>Account Deactivation Hold Active (7-day holding period). Your account will be removed permanently after 7 days unless cancelled.</span>
+          <span>
+            Account Deactivation Hold Active (7-day holding period). Your
+            account will be removed permanently after 7 days unless cancelled.
+          </span>
         </div>
       )}
 
       {/* Consultations Table */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[#2D3728]">Your Telehealth Consultations</h2>
+          <h2 className="text-xl font-bold text-[#2D3728]">
+            Your Telehealth Consultations
+          </h2>
           <button
-            onClick={() => setActiveTab('psychiatrists')}
+            onClick={() => setActiveTab("psychiatrists")}
             className="btn-primary text-xs py-2 px-4"
           >
             + Book New Consultation
@@ -120,12 +142,15 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
         {myBookings.length === 0 ? (
           <div className="p-12 text-center rounded-[24px] bg-[#F7F5EF] border border-[#768c6e]/20 space-y-4">
             <Calendar className="w-12 h-12 text-[#768c6e] mx-auto opacity-60" />
-            <h3 className="text-base font-bold text-[#2D3728]">No Upcoming or Past Consultations</h3>
+            <h3 className="text-base font-bold text-[#2D3728]">
+              No Upcoming or Past Consultations
+            </h3>
             <p className="text-xs text-[#2D3728]/70 max-w-sm mx-auto">
-              You haven’t booked any sessions yet. Browse our SLMC-verified specialists to schedule your private video consultation.
+              You haven’t booked any sessions yet. Browse our SLMC-verified
+              specialists to schedule your private video consultation.
             </p>
             <button
-              onClick={() => setActiveTab('psychiatrists')}
+              onClick={() => setActiveTab("psychiatrists")}
               className="btn-primary text-xs"
             >
               Find a Psychiatrist
@@ -148,42 +173,75 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                 {myBookings.map((bk) => {
                   const dateObj = new Date(bk.slotDatetime);
                   return (
-                    <tr key={bk.id} className="hover:bg-white/60 transition-colors">
-                      <td className="p-4 font-mono font-bold text-[#2D3728]">{bk.id}</td>
-                      <td className="p-4 font-medium text-[#2D3728]">{bk.doctorName}</td>
-                      <td className="p-4 text-[#2D3728]/80 font-mono">
-                        {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at{' '}
-                        {dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    <tr
+                      key={bk.id}
+                      className="hover:bg-white/60 transition-colors"
+                    >
+                      <td className="p-4 font-mono font-bold text-[#2D3728]">
+                        {bk.id}
                       </td>
-                      <td className="p-4 font-mono font-bold text-[#2D3728]">LKR {bk.feeLkr.toLocaleString()}</td>
+                      <td className="p-4 font-medium text-[#2D3728]">
+                        {bk.doctorName}
+                      </td>
+                      <td className="p-4 text-[#2D3728]/80 font-mono">
+                        {dateObj.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}{" "}
+                        at{" "}
+                        {dateObj.toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="p-4 font-mono font-bold text-[#2D3728]">
+                        LKR {bk.feeLkr.toLocaleString()}
+                      </td>
                       <td className="p-4">
-                        {bk.status === 'confirmed' && (
+                        {bk.status === "confirmed" && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 border border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3" /> Confirmed
                           </span>
                         )}
-                        {bk.status === 'completed' && (
+                        {bk.status === "completed" && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-800 border border-blue-500/30">
                             Completed
                           </span>
                         )}
-                        {bk.status === 'cancelled' && (
+                        {bk.status === "cancelled" && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-red-500/15 text-red-800 border border-red-500/30">
                             Cancelled
                           </span>
                         )}
                       </td>
                       <td className="p-4 text-right space-x-2 whitespace-nowrap">
-                        {bk.status === 'confirmed' && (
-                          <button
-                            onClick={() => setActiveJitsiBooking(bk)}
-                            className="btn-primary text-[11px] py-1.5 px-3 inline-flex items-center gap-1 shadow-sm"
-                          >
-                            <Video className="w-3.5 h-3.5" /> Join Jitsi Video Session
-                          </button>
+                        {bk.status === "confirmed" && (
+                          <>
+                            <button
+                              onClick={() => setActiveJitsiBooking(bk)}
+                              className="btn-primary text-[11px] py-1.5 px-3 inline-flex items-center gap-1 shadow-sm"
+                            >
+                              <Video className="w-3.5 h-3.5" /> Join Jitsi Video
+                              Session
+                            </button>
+                            <button
+                              onClick={() => {
+                                const confirmCancel = window.confirm(
+                                  "Cancel this booking? This will not allow a patient refund claim.",
+                                );
+                                if (confirmCancel) {
+                                  cancelBooking(bk.id, "Cancelled by patient.");
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-[11px] transition-colors"
+                            >
+                              Cancel Booking
+                            </button>
+                          </>
                         )}
 
-                        {bk.status === 'completed' && (
+                        {bk.status === "completed" && (
                           <button
                             onClick={() => setReviewBooking(bk)}
                             className="btn-secondary text-[11px] py-1.5 px-3"
@@ -196,7 +254,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                           onClick={() => setComplaintBooking(bk)}
                           className="text-xs text-[#D9635A] hover:underline font-medium"
                         >
-                          Report Issue / Refund
+                          Report Issue
                         </button>
                       </td>
                     </tr>
@@ -219,8 +277,11 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
             className="w-full max-w-md bg-[#F7F5EF] rounded-[24px] p-6 shadow-2xl border border-[#768c6e]/20 space-y-4 animate-scale-up"
           >
             <div className="flex justify-between items-center pb-3 border-b border-[#768c6e]/15">
-              <h3 className="font-bold text-lg text-[#2D3728]">Report Issue / Request Refund</h3>
-              <button onClick={() => setComplaintBooking(null)} className="p-1 text-[#2D3728]/70 hover:bg-[#768c6e]/10 rounded-full">
+              <h3 className="font-bold text-lg text-[#2D3728]">Report Issue</h3>
+              <button
+                onClick={() => setComplaintBooking(null)}
+                className="p-1 text-[#2D3728]/70 hover:bg-[#768c6e]/10 rounded-full"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -228,17 +289,34 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
             {complaintSubmitted ? (
               <div className="p-4 text-center text-xs space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-[#768c6e] mx-auto" />
-                <p className="font-bold text-sm text-[#2D3728]">Complaint Submitted to Administration Queue</p>
-                <p className="text-[#2D3728]/70">Our admin desk will review your submission and issue proof of resolution.</p>
+                <p className="font-bold text-sm text-[#2D3728]">
+                  Complaint Submitted to Administration Queue
+                </p>
+                <p className="text-[#2D3728]/70">
+                  Our admin desk will review your submission and issue proof of
+                  resolution.
+                </p>
               </div>
             ) : (
-              <form onSubmit={handleComplaintSubmit} className="space-y-3 text-xs">
+              <form
+                onSubmit={handleComplaintSubmit}
+                className="space-y-3 text-xs"
+              >
                 <div>
-                  <label className="font-semibold text-[#2D3728]/80 block mb-1">Booking ID</label>
-                  <input type="text" disabled value={complaintBooking.id} className="w-full px-3 py-2 rounded-xl bg-gray-200 text-[#2D3728] font-mono" />
+                  <label className="font-semibold text-[#2D3728]/80 block mb-1">
+                    Booking ID
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={complaintBooking.id}
+                    className="w-full px-3 py-2 rounded-xl bg-gray-200 text-[#2D3728] font-mono"
+                  />
                 </div>
                 <div>
-                  <label className="font-semibold text-[#2D3728]/80 block mb-1">Issue Category</label>
+                  <label className="font-semibold text-[#2D3728]/80 block mb-1">
+                    Issue Category
+                  </label>
                   <select
                     required
                     value={complaintReason}
@@ -246,14 +324,22 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                     className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white"
                   >
                     <option value="">Select reason...</option>
-                    <option value="Audio / Video Connection Drop">Audio / Video Connection Drop</option>
+                    <option value="Audio / Video Connection Drop">
+                      Audio / Video Connection Drop
+                    </option>
                     <option value="Doctor No-Show">Doctor No-Show</option>
-                    <option value="Incorrect Fee Billing">Incorrect Fee Billing</option>
-                    <option value="Other Technical Disruption">Other Technical Disruption</option>
+                    <option value="Incorrect Fee Billing">
+                      Incorrect Fee Billing
+                    </option>
+                    <option value="Other Technical Disruption">
+                      Other Technical Disruption
+                    </option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-[#2D3728]/80 block mb-1">Details & Refund Request Notes</label>
+                  <label className="font-semibold text-[#2D3728]/80 block mb-1">
+                    Issue Details
+                  </label>
                   <textarea
                     required
                     rows={3}
@@ -263,7 +349,10 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                     className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white"
                   />
                 </div>
-                <button type="submit" className="btn-destructive w-full py-2.5 text-xs font-semibold">
+                <button
+                  type="submit"
+                  className="btn-destructive w-full py-2.5 text-xs font-semibold"
+                >
                   Submit Complaint to Admin Desk
                 </button>
               </form>
@@ -283,8 +372,13 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
             className="w-full max-w-md bg-[#F7F5EF] rounded-[24px] p-6 shadow-2xl border border-[#768c6e]/20 space-y-4 animate-scale-up"
           >
             <div className="flex justify-between items-center pb-3 border-b border-[#768c6e]/15">
-              <h3 className="font-bold text-lg text-[#2D3728]">Leave Consultation Review</h3>
-              <button onClick={() => setReviewBooking(null)} className="p-1 text-[#2D3728]/70 hover:bg-[#768c6e]/10 rounded-full">
+              <h3 className="font-bold text-lg text-[#2D3728]">
+                Leave Consultation Review
+              </h3>
+              <button
+                onClick={() => setReviewBooking(null)}
+                className="p-1 text-[#2D3728]/70 hover:bg-[#768c6e]/10 rounded-full"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -292,19 +386,28 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
             {reviewSubmitted ? (
               <div className="p-4 text-center text-xs space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-[#768c6e] mx-auto" />
-                <p className="font-bold text-sm text-[#2D3728]">Thank You for Your Feedback</p>
-                <p className="text-[#2D3728]/70">Your review is now published with a &quot;Verified Consultation&quot; badge.</p>
+                <p className="font-bold text-sm text-[#2D3728]">
+                  Thank You for Your Feedback
+                </p>
+                <p className="text-[#2D3728]/70">
+                  Your review is now published with a &quot;Verified
+                  Consultation&quot; badge.
+                </p>
               </div>
             ) : (
               <form onSubmit={handleReviewSubmit} className="space-y-3 text-xs">
                 <div>
-                  <label className="font-semibold text-[#2D3728]/80 block mb-1">Rating (Stars)</label>
+                  <label className="font-semibold text-[#2D3728]/80 block mb-1">
+                    Rating (Stars)
+                  </label>
                   <select
                     value={reviewRating}
                     onChange={(e) => setReviewRating(Number(e.target.value))}
                     className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white font-bold text-amber-700"
                   >
-                    <option value={5}>★★★★★ (5 Stars - Exceptional Care)</option>
+                    <option value={5}>
+                      ★★★★★ (5 Stars - Exceptional Care)
+                    </option>
                     <option value={4}>★★★★☆ (4 Stars - Very Good)</option>
                     <option value={3}>★★★☆☆ (3 Stars - Average)</option>
                     <option value={2}>★★☆☆☆ (2 Stars - Poor)</option>
@@ -312,7 +415,9 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-[#2D3728]/80 block mb-1">Public Feedback</label>
+                  <label className="font-semibold text-[#2D3728]/80 block mb-1">
+                    Public Feedback
+                  </label>
                   <textarea
                     required
                     rows={4}
@@ -322,7 +427,10 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
                     className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white"
                   />
                 </div>
-                <button type="submit" className="btn-primary w-full py-2.5 text-xs font-semibold">
+                <button
+                  type="submit"
+                  className="btn-primary w-full py-2.5 text-xs font-semibold"
+                >
                   Publish Review
                 </button>
               </form>
@@ -345,7 +453,10 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ setActiveTab
               <AlertTriangle className="w-5 h-5" /> Confirm Account Deactivation
             </h3>
             <p className="text-xs text-[#2D3728]/80 leading-relaxed">
-              Deactivating your account will place your patient profile on a <strong>7-day holding period</strong>. During this window, you can reactivate anytime by signing in. After 7 days, your stored data will be permanently wiped.
+              Deactivating your account will place your patient profile on a{" "}
+              <strong>7-day holding period</strong>. During this window, you can
+              reactivate anytime by signing in. After 7 days, your stored data
+              will be permanently wiped.
             </p>
             <div className="flex gap-3 pt-2">
               <button

@@ -168,9 +168,31 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const result = await bookingsService.cancelBookingByDoctor(
+      const actor = (body.actor || "PATIENT").toUpperCase();
+
+      if (!["PATIENT", "DOCTOR", "ADMIN"].includes(actor)) {
+        return NextResponse.json(
+          { error: "Valid actor is required: PATIENT, DOCTOR, or ADMIN" },
+          { status: 400 },
+        );
+      }
+
+      const resolutionType = body.resolutionType || "none";
+
+      if (actor === "PATIENT" && resolutionType !== "none") {
+        return NextResponse.json(
+          {
+            error:
+              "Patient cancellation cannot include refund or reschedule requests.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const result = await bookingsService.cancelBooking(
         body.bookingId,
-        body.resolutionType,
+        actor,
+        resolutionType,
         body.note,
       );
 
