@@ -1,5 +1,12 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import type { BoostTier, DoctorStatus } from '../../../lib/types';
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from "typeorm";
+
+import type { BoostTier, DoctorStatus } from "../../../lib/types";
 
 export interface SpecialtiesAndLanguagesJson {
   specialties: string[];
@@ -9,7 +16,8 @@ export interface SpecialtiesAndLanguagesJson {
 export interface UpcomingSlotJson {
   id: string;
   datetime: string;
-  status: 'available' | 'booked';
+  durationMins: number;
+  status: "available" | "booked" | "held";
 }
 
 export interface QualificationDocJson {
@@ -17,72 +25,69 @@ export interface QualificationDocJson {
   name: string;
   url: string;
   uploadDate: string;
-  status: 'Approved' | 'Pending' | 'Rejected';
+  status: "Approved" | "Pending" | "Rejected";
+  mimeType: "application/pdf";
 }
 
-@Entity('psychiatrists')
+@Entity("psychiatrists")
 export class PsychiatristEntity {
-  @PrimaryColumn('varchar')
+  @PrimaryColumn("varchar")
   id!: string;
 
-  @Column('varchar')
+  @Column("varchar")
   name!: string;
 
-  @Column('varchar')
+  @Column("varchar")
   title!: string;
 
-  @Column('varchar', { name: 'slmc_reg_no' })
+  @Column("varchar", { name: "slmc_reg_no" })
   slmcRegNo!: string;
 
-  @Column('varchar', { default: 'pending' })
+  @Column("varchar", { default: "pending" })
   status!: DoctorStatus;
 
-  @Column('boolean', { name: 'is_boosted', default: false })
+  @Column("boolean", { name: "is_boosted", default: false })
   isBoosted!: boolean;
 
-  @Column('varchar', { name: 'boost_tier', default: 'none' })
+  @Column("varchar", { name: "boost_tier", default: "none" })
   boostTier!: BoostTier;
 
-  @Column('varchar', { name: 'boost_expiry', nullable: true })
+  @Column("varchar", { name: "boost_expiry", nullable: true })
   boostExpiry!: string | null;
 
-  @Column('text')
+  @Column("text")
   photo!: string;
 
-  @Column('text')
+  @Column("text")
   bio!: string;
 
-  @Column('varchar')
+  @Column("varchar")
   district!: string;
 
-  @Column('integer', { name: 'fee_lkr' })
+  @Column("integer", { name: "fee_lkr" })
   feeLkr!: number;
 
-  @Column('float', { default: 0 })
+  @Column("float", { default: 0 })
   rating!: number;
 
-  @Column('integer', { name: 'review_count', default: 0 })
+  @Column("integer", { name: "review_count", default: 0 })
   reviewCount!: number;
 
-  // JSONB Column for Specialties and Languages (supports @> containment queries)
-  @Column('jsonb', { name: 'specialties_and_languages' })
+  @Column("jsonb", { name: "specialties_and_languages" })
   specialtiesAndLanguages!: SpecialtiesAndLanguagesJson;
 
-  // JSONB Column for Rating Distribution
-  @Column('jsonb', { name: 'rating_distribution' })
+  @Column("jsonb", { name: "rating_distribution" })
   ratingDistribution!: Record<string, number>;
 
-  // JSONB Column for Upcoming Telehealth Slots
-  @Column('jsonb', { name: 'upcoming_slots', default: '[]' })
+  @Column("jsonb", { name: "upcoming_slots", default: "[]" })
   upcomingSlots!: UpcomingSlotJson[];
 
-  // JSONB Column for Verification Documents
-  @Column('jsonb', { name: 'documents', default: '[]' })
+  @Column("jsonb", { name: "documents", default: "[]" })
   documents!: QualificationDocJson[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
 }

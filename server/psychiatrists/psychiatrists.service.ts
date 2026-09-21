@@ -1,5 +1,13 @@
-import { Psychiatrist, BoostTier, DoctorStatus } from '../../lib/types';
-import { initialPsychiatrists, initialPlatformSettings } from '../../lib/mockData';
+import {
+  Psychiatrist,
+  BoostTier,
+  DoctorStatus,
+  DoctorSlot,
+} from "../../lib/types";
+import {
+  initialPsychiatrists,
+  initialPlatformSettings,
+} from "../../lib/mockData";
 
 export class PsychiatristsService {
   private psychiatrists: Psychiatrist[] = [...initialPsychiatrists];
@@ -14,16 +22,23 @@ export class PsychiatristsService {
     return doc;
   }
 
-  boost(doctorId: string, tier: BoostTier): { success: boolean; message: string; doctor?: Psychiatrist } {
-    const currentlyBoostedCount = this.psychiatrists.filter((d) => d.isBoosted && d.id !== doctorId).length;
+  boost(
+    doctorId: string,
+    tier: BoostTier,
+  ): { success: boolean; message: string; doctor?: Psychiatrist } {
+    const currentlyBoostedCount = this.psychiatrists.filter(
+      (d) => d.isBoosted && d.id !== doctorId,
+    ).length;
     if (currentlyBoostedCount >= initialPlatformSettings.maxBoostedDoctors) {
       throw new Error(
-        `Boost limit reached! Maximum ${initialPlatformSettings.maxBoostedDoctors} psychiatrists can be boosted platform-wide.`
+        `Boost limit reached! Maximum ${initialPlatformSettings.maxBoostedDoctors} psychiatrists can be boosted platform-wide.`,
       );
     }
 
-    const daysToAdd = tier === '1-day' ? 1 : 3;
-    const expiry = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
+    const daysToAdd = tier === "1-day" ? 1 : 3;
+    const expiry = new Date(
+      Date.now() + daysToAdd * 24 * 60 * 60 * 1000,
+    ).toISOString();
 
     let updatedDoctor: Psychiatrist | undefined;
     this.psychiatrists = this.psychiatrists.map((doc) => {
@@ -53,7 +68,7 @@ export class PsychiatristsService {
         updatedDoc = {
           ...doc,
           isBoosted: false,
-          boostTier: 'none',
+          boostTier: "none",
           boostExpiry: null,
         };
         return updatedDoc;
@@ -80,19 +95,21 @@ export class PsychiatristsService {
   addDoctor(docData: Partial<Psychiatrist>): Psychiatrist {
     const newDoc: Psychiatrist = {
       id: `doc-${Date.now()}`,
-      name: docData.name || 'Dr. New Doctor',
-      title: docData.title || 'Consultant Psychiatrist',
-      slmcRegNo: docData.slmcRegNo || 'SLMC-PENDING',
-      status: 'pending',
+      name: docData.name || "Dr. New Doctor",
+      title: docData.title || "Consultant Psychiatrist",
+      slmcRegNo: docData.slmcRegNo || "SLMC-PENDING",
+      status: "pending",
       isBoosted: false,
-      boostTier: 'none',
+      boostTier: "none",
       boostExpiry: null,
-      photo: docData.photo || 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=600&auto=format&fit=crop',
-      bio: docData.bio || 'New SLMC registered practitioner.',
-      languages: docData.languages || ['English', 'Sinhala'],
-      sessionFormats: docData.sessionFormats || ['Video Telehealth'],
-      specialties: docData.specialties || ['General Psychiatry'],
-      district: docData.district || 'Colombo',
+      photo:
+        docData.photo ||
+        "https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=600&auto=format&fit=crop",
+      bio: docData.bio || "New SLMC registered practitioner.",
+      languages: docData.languages || ["English", "Sinhala"],
+      sessionFormats: docData.sessionFormats || ["Video Telehealth"],
+      specialties: docData.specialties || ["General Psychiatry"],
+      district: docData.district || "Colombo",
       feeLkr: docData.feeLkr || 5000,
       rating: 0,
       reviewCount: 0,
@@ -101,10 +118,10 @@ export class PsychiatristsService {
       documents: [
         {
           id: `doc-${Date.now()}-1`,
-          name: 'SLMC_Registration_Application.pdf',
-          url: '#',
-          uploadDate: new Date().toISOString().split('T')[0],
-          status: 'Pending',
+          name: "SLMC_Registration_Application.pdf",
+          url: "#",
+          uploadDate: new Date().toISOString().split("T")[0],
+          status: "Pending",
         },
       ],
     };
@@ -119,10 +136,10 @@ export class PsychiatristsService {
       if (doc.id === doctorId) {
         const newFile = {
           id: `doc-file-${Date.now()}`,
-          name: docName || 'SLMC_Qualification_Doc.pdf',
-          url: '#',
-          uploadDate: new Date().toISOString().split('T')[0],
-          status: 'Pending' as const,
+          name: docName || "SLMC_Qualification_Doc.pdf",
+          url: "#",
+          uploadDate: new Date().toISOString().split("T")[0],
+          status: "Pending" as const,
         };
         updatedDoc = { ...doc, documents: [newFile, ...doc.documents] };
         return updatedDoc;
@@ -149,12 +166,65 @@ export class PsychiatristsService {
     return updatedDoc;
   }
 
+  addDoctorSlot(
+    doctorId: string,
+    slotData: {
+      datetime: string;
+      durationMins: number;
+    },
+  ): DoctorSlot {
+    const doctor = this.psychiatrists.find((doc) => doc.id === doctorId);
+
+    if (!doctor) {
+      throw new Error(`Psychiatrist with ID ${doctorId} not found`);
+    }
+
+    if (!slotData.datetime) {
+      throw new Error("Slot date and time are required");
+    }
+
+    if (!slotData.durationMins || slotData.durationMins <= 0) {
+      throw new Error("Slot duration must be greater than 0");
+    }
+
+    const slotDate = new Date(slotData.datetime);
+
+    if (Number.isNaN(slotDate.getTime())) {
+      throw new Error("Invalid slot date and time");
+    }
+
+    const newSlot: DoctorSlot = {
+      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      datetime: slotDate.toISOString(),
+      durationMins: slotData.durationMins,
+      status: "available",
+    };
+
+    this.psychiatrists = this.psychiatrists.map((doc) => {
+      if (doc.id !== doctorId) {
+        return doc;
+      }
+
+      return {
+        ...doc,
+        upcomingSlots: [...doc.upcomingSlots, newSlot].sort(
+          (a, b) =>
+            new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
+        ),
+      };
+    });
+
+    return newSlot;
+  }
+
   markSlotBooked(doctorId: string, slotId: string) {
     this.psychiatrists = this.psychiatrists.map((doc) => {
       if (doc.id === doctorId) {
         return {
           ...doc,
-          upcomingSlots: doc.upcomingSlots.map((s) => (s.id === slotId ? { ...s, status: 'booked' } : s)),
+          upcomingSlots: doc.upcomingSlots.map((s) =>
+            s.id === slotId ? { ...s, status: "booked" } : s,
+          ),
         };
       }
       return doc;

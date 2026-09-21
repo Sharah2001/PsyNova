@@ -760,12 +760,79 @@ export class BookingsService {
     return updated;
   }
 
-  async cancelBookingByDoctor(
-    id: string,
-    resolutionType: "none" | "reschedule" | "refund" = "none",
-    note?: string,
-  ): Promise<Booking> {
-    return this.cancelBooking(id, "DOCTOR", resolutionType, note);
+  async cancelBookingByDoctor(id: string, reason: string): Promise<Booking> {
+    const booking = await this.findOne(id);
+
+    if (booking.status !== "confirmed") {
+      throw new Error(
+        "Only confirmed consultations can be cancelled by a doctor.",
+      );
+    }
+
+    if (!reason || reason.trim().length < 5) {
+      throw new Error(
+        "A cancellation reason of at least 5 characters is required.",
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    const updated: Booking = {
+      ...booking,
+
+      status: "cancelled",
+
+      cancelledBy: "DOCTOR",
+      cancellationReason: reason.trim(),
+      cancelledAt: now,
+
+      resolutionType: "refund",
+
+      refundStatus: "requested",
+      refundRequestedBy: booking.doctorId,
+      refundRequestedAt: now,
+      refundAmount: Number(booking.feeLkr),
+
+      statusHistory: [
+        ...booking.statusHistory,
+        {
+          status: "cancelled",
+          timestamp: now,
+          note: "Doctor cancelled the consultation. Full patient refund requested.",
+        },
+      ],
+    };
+
+    this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
+
+    if (this.databaseService) {
+      const saved = await this.databaseService.saveBooking(updated);
+
+      if (!saved) {
+        throw new Error(
+          `Doctor cancellation for ${id} could not be persisted to PostgreSQL.`,
+        );
+      }
+    }
+
+    // Make the doctor's slot available again if the service supports it.
+    try {
+      const slotService = this.psychiatristsService as any;
+
+      if (typeof slotService.markSlotAvailable === "function") {
+        await slotService.markSlotAvailable(booking.doctorId, booking.slotId);
+      } else if (typeof slotService.markSlotBooked === "function") {
+        // Fallback for services that only expose the booking update method.
+        slotService.markSlotBooked(booking.doctorId, booking.slotId);
+      }
+    } catch (error) {
+      console.warn(
+        `[Booking] Could not release slot ${booking.slotId}:`,
+        error,
+      );
+    }
+
+    return updated;
   }
 
   async cancelBookingByAdmin(
@@ -879,8 +946,27 @@ export class BookingsService {
   // COMPLETE
   // ============================================================
 
-  async completeBooking(id: string): Promise<Booking> {
+  async completeBooking(id: string, doctorId: string): Promise<Booking> {
     const booking = await this.findOne(id);
+
+    if (booking.doctorId !== doctorId) {
+      throw new Error("You are not authorized to complete this consultation.");
+    }
+
+    if (booking.status !== "confirmed") {
+      throw new Error(
+        "Only confirmed consultations can be marked as completed.",
+      );
+    }
+
+    const now = new Date();
+
+    const sessionTime = new Date(booking.slotDatetime);
+
+    // Allow completion only when the consultation time has started.
+    if (sessionTime.getTime() > now.getTime()) {
+      throw new Error("This consultation has not started yet.");
+    }
 
     const updated: Booking = {
       ...booking,
@@ -896,8 +982,8 @@ export class BookingsService {
         ...booking.statusHistory,
         {
           status: "completed",
-          timestamp: new Date().toISOString(),
-          note: "Consultation marked completed",
+          timestamp: now.toISOString(),
+          note: `Doctor ${doctorId} completed the consultation.`,
         },
       ],
     };
@@ -905,7 +991,13 @@ export class BookingsService {
     this.bookings = [updated, ...this.bookings.filter((b) => b.id !== id)];
 
     if (this.databaseService) {
-      await this.databaseService.saveBooking(updated);
+      const saved = await this.databaseService.saveBooking(updated);
+
+      if (!saved) {
+        throw new Error(
+          `Completed booking ${id} could not be saved to PostgreSQL.`,
+        );
+      }
     }
 
     return updated;

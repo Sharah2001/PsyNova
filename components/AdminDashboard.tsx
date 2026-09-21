@@ -63,7 +63,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updatePlatformSettings,
   } = usePsyNova();
 
-  const [currentSubTab, setCurrentSubTab] = useState<string>(activeSubTab);
+  const adminTabMap: Record<string, string> = {
+    "admin-overview": "overview",
+    "admin-users": "users",
+    "admin-psychiatrists": "psychiatrists",
+    "admin-bookings": "bookings",
+    "admin-refunds": "refunds",
+    "admin-complaints": "complaints",
+    "admin-payments": "payments",
+    "admin-documents": "documents",
+    "admin-settings": "settings",
+  };
+
+  const currentSubTab = adminTabMap[activeSubTab] || activeSubTab || "overview";
   const [selectedPatientFilter, setSelectedPatientFilter] =
     useState<string>("");
   const [patientSearchQuery, setPatientSearchQuery] = useState<string>("");
@@ -248,7 +260,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       {/* Admin Navigation Sub-Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[#768c6e]/20">
+      {/* <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[#768c6e]/20">
         {adminLinks.map((link) => {
           const Icon = link.icon;
           const isActive = currentSubTab === link.id;
@@ -289,7 +301,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           );
         })}
-      </div>
+      </div> */}
 
       {boostMsg && (
         <div className="p-4 rounded-2xl bg-[#768c6e]/15 border border-[#768c6e]/30 text-xs font-semibold text-[#2D3728]">
@@ -305,7 +317,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div
               onClick={() => {
                 setSelectedPatientFilter("");
-                setCurrentSubTab("bookings");
+                setActiveTab("admin-bookings");
               }}
               className="psynova-card p-6 space-y-1 cursor-pointer hover:border-[#768c6e] hover:shadow-lg transition-all group relative overflow-hidden"
             >
@@ -1846,7 +1858,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button
                         onClick={() => {
                           setSelectedPatientFilter(pat.email);
-                          setCurrentSubTab("bookings");
+                          setActiveTab("admin-bookings");
                         }}
                         className="btn-primary text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm"
                       >

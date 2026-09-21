@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { PsyNovaProvider, usePsyNova } from '@/lib/store';
-import { Psychiatrist, DoctorSlot, Booking } from '@/lib/types';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
-import { CrisisBand } from '@/components/CrisisBand';
-import { RoleSelectorModal } from '@/components/RoleSelectorModal';
-import { PayHereCheckoutModal } from '@/components/PayHereCheckoutModal';
-import { GuestAuthModal } from '@/components/GuestAuthModal';
-import { HomeView } from '@/components/HomeView';
-import { PsychiatristsView } from '@/components/PsychiatristsView';
-import { ReviewsView } from '@/components/ReviewsView';
-import { AboutAndSupportView } from '@/components/AboutAndSupportView';
-import { PatientDashboard } from '@/components/PatientDashboard';
-import { DoctorPortal } from '@/components/DoctorPortal';
-import { AdminDashboard } from '@/components/AdminDashboard';
+import React, { useState } from "react";
+import { PsyNovaProvider, usePsyNova } from "@/lib/store";
+import { Psychiatrist, DoctorSlot, Booking } from "@/lib/types";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { CrisisBand } from "@/components/CrisisBand";
+import { RoleSelectorModal } from "@/components/RoleSelectorModal";
+import { PayHereCheckoutModal } from "@/components/PayHereCheckoutModal";
+import { GuestAuthModal } from "@/components/GuestAuthModal";
+import { HomeView } from "@/components/HomeView";
+import { PsychiatristsView } from "@/components/PsychiatristsView";
+import { ReviewsView } from "@/components/ReviewsView";
+import { AboutAndSupportView } from "@/components/AboutAndSupportView";
+import { PatientDashboard } from "@/components/PatientDashboard";
+import { DoctorPortal } from "@/components/DoctorPortal";
+import { AdminDashboard } from "@/components/AdminDashboard";
 
 function MainAppContent() {
   const { user, showRoleSelector, setShowRoleSelector } = usePsyNova();
-  const [activeTab, setActiveTab] = useState<string>('home');
+  const [activeTab, setActiveTab] = useState<string>("home");
 
   // Booking Modal & Guest Auth States
   const [bookingDoctor, setBookingDoctor] = useState<Psychiatrist | null>(null);
@@ -27,7 +27,9 @@ function MainAppContent() {
   const [isPayHereModalOpen, setIsPayHereModalOpen] = useState(false);
 
   // Guest Auth Intercept State
-  const [guestAuthDoctor, setGuestAuthDoctor] = useState<Psychiatrist | null>(null);
+  const [guestAuthDoctor, setGuestAuthDoctor] = useState<Psychiatrist | null>(
+    null,
+  );
   const [guestAuthSlot, setGuestAuthSlot] = useState<DoctorSlot | null>(null);
   const [isGuestAuthOpen, setIsGuestAuthOpen] = useState(false);
 
@@ -39,7 +41,7 @@ function MainAppContent() {
   }>({});
 
   const handleSelectDoctorToBook = (doc: Psychiatrist, slot: DoctorSlot) => {
-    if (user.role === 'guest') {
+    if (user.role === "guest") {
       // Guest visitor ready to book: Prompt to sign in or register patient account first
       setGuestAuthDoctor(doc);
       setGuestAuthSlot(slot);
@@ -53,7 +55,11 @@ function MainAppContent() {
     setIsPayHereModalOpen(true);
   };
 
-  const handleGuestAuthSuccess = (patientData: { name: string; email: string; contact: string }) => {
+  const handleGuestAuthSuccess = (patientData: {
+    name: string;
+    email: string;
+    contact: string;
+  }) => {
     setIsGuestAuthOpen(false);
     setPatientDataOverride(patientData);
 
@@ -66,7 +72,7 @@ function MainAppContent() {
 
   const handleBookingSuccess = (createdBooking: Booking) => {
     // Navigate to patient dashboard on successful booking
-    setActiveTab('patient-dashboard');
+    setActiveTab("patient-dashboard");
   };
 
   return (
@@ -80,32 +86,33 @@ function MainAppContent() {
 
       {/* Main View Router */}
       <main className="flex-1">
-        {activeTab === 'home' && (
+        {activeTab === "home" && (
           <HomeView
             setActiveTab={setActiveTab}
             onSelectDoctorToBook={handleSelectDoctorToBook}
           />
         )}
 
-        {activeTab === 'psychiatrists' && (
+        {activeTab === "psychiatrists" && (
           <PsychiatristsView onSelectDoctorToBook={handleSelectDoctorToBook} />
         )}
 
-        {activeTab === 'reviews' && <ReviewsView />}
+        {activeTab === "reviews" && <ReviewsView />}
 
-        {activeTab === 'about' && <AboutAndSupportView initialTab="about" />}
+        {activeTab === "about" && <AboutAndSupportView initialTab="about" />}
 
-        {activeTab === 'support' && <AboutAndSupportView initialTab="support" />}
+        {activeTab === "support" && (
+          <AboutAndSupportView initialTab="support" />
+        )}
 
-        {activeTab === 'patient-dashboard' && (
+        {activeTab === "patient-dashboard" && (
           <PatientDashboard setActiveTab={setActiveTab} />
         )}
 
-        {activeTab === 'doctor-portal' && <DoctorPortal />}
-
-        {activeTab.startsWith('admin') && (
+        {user.role === "psychiatrist" && <DoctorPortal />}
+        {activeTab.startsWith("admin") && (
           <AdminDashboard
-            activeSubTab={activeTab.replace('admin-', '') || 'overview'}
+            activeSubTab={activeTab.replace("admin-", "") || "overview"}
             setActiveTab={setActiveTab}
           />
         )}

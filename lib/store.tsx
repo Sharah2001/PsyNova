@@ -899,6 +899,8 @@ export const PsyNovaProvider: React.FC<{ children: React.ReactNode }> = ({
           `[PsyNova] Slot ${slot.id} saved for doctor ${doctorId}`,
           data,
         );
+
+        await refreshPsychiatrists();
       })
       .catch((error) => {
         console.error("[PsyNova] Failed to save doctor slot:", error);

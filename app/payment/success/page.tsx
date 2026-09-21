@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -119,7 +125,7 @@ function formatCurrency(amount: number) {
 function isPaymentConfirmed(booking: Booking) {
   return booking.paymentStatus === "paid" && booking.status === "confirmed";
 }
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
 
   const orderId = searchParams.get("order_id");
@@ -720,5 +726,33 @@ export default function PaymentSuccessPage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-50 px-4 py-12">
+          <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
+            <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                <RefreshCw className="h-7 w-7 animate-spin text-slate-700" />
+              </div>
+
+              <h1 className="text-2xl font-bold text-slate-900">
+                Loading payment details
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Preparing your secure payment confirmation.
+              </p>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

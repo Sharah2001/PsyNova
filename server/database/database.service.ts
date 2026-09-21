@@ -15,6 +15,8 @@ import {
   initialReviews,
   initialComplaints,
   initialPlatformSettings,
+  initialPatients,
+  initialBookings,
 } from "../../lib/mockData";
 
 import { PatientAccount } from "../../lib/types";
@@ -569,7 +571,91 @@ export class DatabaseService {
       }
     }
 
-    // 4. Complaints
+    // 4. Patients
+    const patientRepo = ds.getRepository(PatientEntity);
+
+    const countPatients = await patientRepo.count();
+
+    if (countPatients === 0) {
+      for (const patient of initialPatients) {
+        await patientRepo.save({
+          id: patient.id,
+          clientId: patient.clientId,
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          district: patient.district,
+          password: patient.password,
+          status: patient.status,
+          createdAt: new Date(patient.createdAt),
+        });
+      }
+    }
+
+    // 5. Bookings
+    const bookingRepo = ds.getRepository(BookingEntity);
+
+    const countBookings = await bookingRepo.count();
+
+    if (countBookings === 0) {
+      for (const booking of initialBookings) {
+        await bookingRepo.save({
+          id: booking.id,
+          doctorId: booking.doctorId,
+          doctorName: booking.doctorName,
+          patientId: booking.patientId,
+          patientName: booking.patientName,
+          patientEmail: booking.patientEmail,
+          patientContact: booking.patientContact,
+          slotId: booking.slotId,
+          slotDatetime: booking.slotDatetime,
+          status: booking.status,
+          paymentStatus: booking.paymentStatus,
+          feeLkr: booking.feeLkr,
+          platformCommissionLkr: booking.platformCommissionLkr,
+          netDoctorEarningLkr: booking.netDoctorEarningLkr,
+          payhereRef: booking.payhereRef || null,
+          bookedBy: booking.bookedBy || null,
+          statusHistory: booking.statusHistory.map((entry) => ({
+            status: entry.status,
+            timestamp: entry.timestamp,
+            note: entry.note,
+          })),
+          createdAt: new Date(booking.createdAt),
+          confirmationSmsSent: booking.confirmationSmsSent ?? false,
+          reminder5MinSent: booking.reminder5MinSent ?? false,
+          gatewayResponse: booking.gatewayResponse || null,
+          cancellationReason: booking.cancellationReason ?? null,
+          cancelledBy: booking.cancelledBy ?? null,
+          cancelledAt: booking.cancelledAt
+            ? new Date(booking.cancelledAt)
+            : null,
+          resolutionType: booking.resolutionType ?? "none",
+          refundStatus: booking.refundStatus ?? "none",
+          refundRequestedBy: booking.refundRequestedBy ?? null,
+          refundRequestedAt: booking.refundRequestedAt
+            ? new Date(booking.refundRequestedAt)
+            : null,
+          refundApprovedBy: booking.refundApprovedBy ?? null,
+          refundApprovedAt: booking.refundApprovedAt
+            ? new Date(booking.refundApprovedAt)
+            : null,
+          refundAmount: booking.refundAmount ?? null,
+          refundReference: booking.refundReference ?? null,
+          rescheduleStatus: booking.rescheduleStatus ?? "none",
+          rescheduleRequestedAt: booking.rescheduleRequestedAt
+            ? new Date(booking.rescheduleRequestedAt)
+            : null,
+          rescheduleRequestedBy: booking.rescheduleRequestedBy ?? null,
+          previousSlotId: booking.previousSlotId ?? null,
+          previousSlotDatetime: booking.previousSlotDatetime ?? null,
+          proposedSlotId: booking.proposedSlotId ?? null,
+          proposedSlotDatetime: booking.proposedSlotDatetime ?? null,
+        });
+      }
+    }
+
+    // 6. Complaints
     const cmpRepo = ds.getRepository(ComplaintEntity);
 
     const countComplaints = await cmpRepo.count();
