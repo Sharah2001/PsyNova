@@ -1,34 +1,49 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from "typeorm";
 
-@Entity('complaints')
+@Entity("complaints")
 export class ComplaintEntity {
-  @PrimaryColumn('varchar')
+  @PrimaryColumn("varchar")
   id!: string;
 
-  @Column('varchar', { name: 'booking_id' })
+  @Column("varchar", { name: "booking_id" })
   bookingId!: string;
 
-  @Column('varchar', { name: 'complainant_type' })
-  complainantType!: 'patient' | 'psychiatrist';
+  @Column("varchar", { name: "complainant_type" })
+  complainantType!: "patient" | "psychiatrist";
 
-  @Column('varchar', { name: 'complainant_name' })
+  @Column("varchar", { name: "complainant_name" })
   complainantName!: string;
 
-  @Column('varchar')
+  @Column("varchar")
   subject!: string;
 
-  @Column('text')
+  @Column("text")
   description!: string;
 
-  @Column('varchar', { default: 'Pending Review' })
-  status!: 'Pending Review' | 'Investigating' | 'Resolved' | 'Dismissed';
+  @Column("varchar", { default: "Pending Review" })
+  status!: "Pending Review" | "Investigating" | "Resolved" | "Dismissed";
 
-  @Column('text', { name: 'resolution_notes', nullable: true })
+  @Column("text", { name: "resolution_notes", nullable: true })
   resolutionNotes!: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column("varchar", { name: "resolution_document_name", nullable: true })
+  resolutionDocumentName!: string | null;
+
+  @Column("text", { name: "resolution_document_url", nullable: true })
+  resolutionDocumentUrl!: string | null;
+
+  @Column("timestamp", { name: "resolved_at", nullable: true })
+  resolvedAt!: Date | null;
+
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
 }

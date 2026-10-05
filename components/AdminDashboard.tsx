@@ -63,6 +63,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updatePlatformSettings,
   } = usePsyNova();
 
+  const [proofFile, setProofFile] = useState<File | null>(null);
+
   const adminTabMap: Record<string, string> = {
     "admin-overview": "overview",
     "admin-users": "users",
@@ -206,14 +208,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSolveComplaintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!solvingComplaintId) return;
-    resolveComplaint(
-      solvingComplaintId,
-      "Ref_Proof_Uploaded_PayHere.pdf",
-      proofNote,
-    );
+
+    if (!proofFile) {
+      alert("Please upload a resolution proof document.");
+      return;
+    }
+
+    resolveComplaint(solvingComplaintId, proofFile.name, proofNote.trim());
+
     setSolvingComplaintId(null);
     setProofNote("");
+    setProofFile(null);
   };
 
   const handleFlagSubmit = (e: React.FormEvent) => {
@@ -226,6 +233,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFlaggingReviewId(null);
     setFlaggingNote("");
   };
+
+  // function setProofFile(file: File | null) {
+  //   throw new Error("Function not implemented.");
+  // }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-8">
@@ -1130,6 +1141,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white text-[#2D3728] focus:outline-none focus:ring-2 focus:ring-[#768c6e]"
                 />
               </div>
+
+              <div>
+                <label className="font-semibold block mb-1 text-[#2D3728]">
+                  Resolution Proof Document
+                </label>
+
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setProofFile(file);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-[#768c6e]/30 bg-white text-[#2D3728] text-xs"
+                />
+
+                <p className="text-[10px] text-[#2D3728]/50 mt-1">
+                  Accepted formats: PDF, JPG, JPEG, PNG
+                </p>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSolvingComplaintId(null)}
+                  className="btn-outline py-2 px-4 text-xs"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn-primary py-2 px-4 text-xs font-semibold shadow-md"
+                >
+                  Mark Resolved & File Proof
+                </button>
+              </div>
+              {/* 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -1144,7 +1194,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   Mark Resolved & File Proof
                 </button>
-              </div>
+              </div> */}
             </form>
           </div>
         </div>

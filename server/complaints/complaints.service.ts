@@ -1,14 +1,14 @@
-﻿import { Complaint } from '../../lib/types';
-import { initialComplaints } from '../../lib/mockData';
-import { BookingsService } from '../bookings/bookings.service';
-import { DatabaseService } from '../database/database.service';
+﻿import { Complaint } from "../../lib/types";
+import { initialComplaints } from "../../lib/mockData";
+import { BookingsService } from "../bookings/bookings.service";
+import { DatabaseService } from "../database/database.service";
 
 export class ComplaintsService {
   private complaints: Complaint[] = [...initialComplaints];
 
   constructor(
     private readonly bookingsService: BookingsService,
-    private readonly databaseService?: DatabaseService
+    private readonly databaseService?: DatabaseService,
   ) {}
 
   findAll(): Complaint[] {
@@ -19,7 +19,7 @@ export class ComplaintsService {
     bookingId: string,
     reason: string,
     details: string,
-    patientName?: string
+    patientName?: string,
   ): Promise<Complaint> {
     let booking;
 
@@ -30,13 +30,13 @@ export class ComplaintsService {
     const newComplaint: Complaint = {
       id: `CMP-${Math.floor(1000 + Math.random() * 9000)}`,
       bookingId,
-      patientId: booking?.patientId || 'pat-1',
-      patientName: patientName || booking?.patientName || 'Patient',
-      doctorId: booking?.doctorId || 'doc-1',
-      doctorName: booking?.doctorName || 'Psychiatrist',
+      patientId: booking?.patientId || "pat-1",
+      patientName: patientName || booking?.patientName || "Patient",
+      doctorId: booking?.doctorId || "doc-1",
+      doctorName: booking?.doctorName || "Psychiatrist",
       reason,
       details,
-      status: 'Pending',
+      status: "Pending",
       createdAt: new Date().toISOString(),
     };
 
@@ -44,28 +44,28 @@ export class ComplaintsService {
 
     this.databaseService
       ?.saveComplaint(newComplaint)
-      .catch((e) => console.warn('Postgres saveComplaint error:', e));
+      .catch((e) => console.warn("Postgres saveComplaint error:", e));
 
     return newComplaint;
   }
 
-  resolveComplaint(
+  async resolveComplaint(
     complaintId: string,
-    proofUrl: string,
-    note: string
-  ): Complaint {
+    documentName: string,
+    documentUrl: string,
+    note: string,
+  ): Promise<Complaint> {
     let updated: Complaint | undefined;
 
     this.complaints = this.complaints.map((c) => {
       if (c.id === complaintId) {
         updated = {
           ...c,
-          status: 'Resolved',
-          resolutionProof:
-            proofUrl || 'Proof_Document_Uploaded.pdf',
-          resolutionNote:
-            note || 'Issue resolved by administration refund protocol.',
+          status: "Resolved",
+          resolutionProof: documentUrl,
+          resolutionNote: note || "Issue resolved by administration.",
         };
+
         return updated;
       }
 
@@ -73,12 +73,10 @@ export class ComplaintsService {
     });
 
     if (!updated) {
-      throw new Error('Complaint not found');
+      throw new Error("Complaint not found");
     }
 
-    this.databaseService
-      ?.saveComplaint(updated)
-      .catch((e) => console.warn('Postgres saveComplaint error:', e));
+    await this.databaseService?.saveComplaint(updated);
 
     return updated;
   }
