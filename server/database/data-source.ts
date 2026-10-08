@@ -14,9 +14,11 @@ import { PatientEntity } from "./entities/patient.entity";
 import { ReviewEntity } from "./entities/review.entity";
 import { ComplaintEntity } from "./entities/complaint.entity";
 import { SettingsEntity } from "./entities/settings.entity";
+import { BlogEntity } from "./entities/blog.entity";
 // import { InitialSchema1700000000000 } from "./migrations/1700000000000-InitialSchema";
 // import { AddBookingCreator1700000001000 } from "./migrations/1700000001000-AddBookingCreator";
 import { AddBookingSmsFields1700000001200 } from "./migrations/1700000001200-AddBookingSmsFields";
+import { AddBlogPosts1700000001300 } from "./migrations/1700000001300-AddBlogPosts";
 let dataSourceInstance: DataSource | null = null;
 
 export function getAppDataSource(): DataSource {
@@ -31,8 +33,9 @@ export function getAppDataSource(): DataSource {
         ReviewEntity,
         ComplaintEntity,
         SettingsEntity,
+        BlogEntity,
       ],
-      migrations: [AddBookingSmsFields1700000001200],
+      migrations: [AddBookingSmsFields1700000001200, AddBlogPosts1700000001300],
     });
   }
   return dataSourceInstance;

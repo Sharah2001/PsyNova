@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { usePsyNova } from '@/lib/store';
 import { Stethoscope, User, ShieldCheck, Menu, X, ArrowRight, Star, HeartHandshake, PhoneCall, LogOut } from 'lucide-react';
+import Link from 'next/link';
 
 interface NavbarProps {
   activeTab: string;
@@ -82,6 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenR
               </button>
             );
           })}
+          <Link href="/blog" className="px-3.5 py-2 rounded-full text-xs lg:text-sm font-medium text-[#F7F5EF]/90 hover:text-[#F7F5EF] hover:bg-white/10 transition-all">Blog</Link>
         </nav>
 
         {/* Auth State / Actions */}
@@ -162,6 +164,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenR
               {item.label}
             </button>
           ))}
+          <Link href="/blog" onClick={() => setMobileMenuOpen(false)} className="block w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-[#F7F5EF] hover:bg-white/10">Blog</Link>
 
           <div className="pt-3 border-t border-white/15 flex flex-col gap-2">
             {user.role !== 'guest' ? (

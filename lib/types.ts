@@ -1,5 +1,28 @@
 export type UserRole = "guest" | "patient" | "psychiatrist" | "admin";
 
+export interface BlogSection {
+  id: string;
+  heading: string;
+  level: 2 | 3;
+  paragraphs: string[];
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  metaTitle: string;
+  metaDescription: string;
+  author: string;
+  image: string;
+  imageAlt: string;
+  sections: BlogSection[];
+  status: "draft" | "published";
+  publishedAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   email: string;

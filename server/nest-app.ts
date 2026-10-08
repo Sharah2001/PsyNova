@@ -8,6 +8,7 @@ import { SettingsService } from "./settings/settings.service";
 import { NotifyLkService } from "./sms/notifylk.service";
 import { PayHereService } from "./payments/payhere.service";
 import { DatabaseService } from "./database/database.service";
+import { BlogsService } from "./blog/blogs.service";
 
 const databaseService = new DatabaseService();
 const psychiatristsService = new PsychiatristsService();
@@ -27,6 +28,7 @@ const authService = new AuthService();
 const settingsService = new SettingsService(databaseService);
 const notifyLkService = new NotifyLkService();
 const payHereService = new PayHereService();
+const blogsService = new BlogsService(databaseService);
 
 export async function getNestServices() {
   return {
@@ -40,5 +42,6 @@ export async function getNestServices() {
     smsWayService: notifyLkService,
     payHereService,
     databaseService,
+    blogsService,
   };
 }

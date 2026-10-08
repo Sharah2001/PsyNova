@@ -32,7 +32,9 @@ import {
   Clock,
   RefreshCw,
   Send,
+  FileText,
 } from "lucide-react";
+import { AdminBlogManager } from "./AdminBlogManager";
 
 interface AdminDashboardProps {
   activeSubTab?: string;
@@ -162,6 +164,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     { id: "complaints", label: "Complaints Queue", icon: ShieldAlert },
     { id: "payments", label: "Financial Payouts", icon: CreditCard },
     { id: "calendar", label: "Admin Calendar", icon: CalendarIcon },
+    { id: "blogs", label: "Blog Publishing", icon: FileText },
     { id: "settings", label: "Platform Settings", icon: Settings },
   ];
 
@@ -298,6 +301,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* SUB-PAGE 1: OVERVIEW */}
+      {currentSubTab === "blogs" && <AdminBlogManager />}
+
       {currentSubTab === "overview" && (
         <div className="space-y-8">
           {/* Stat Cards */}

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Stethoscope, ShieldCheck, PhoneCall, Heart } from 'lucide-react';
+import Link from 'next/link';
 
 interface FooterProps {
   setActiveTab: (tab: string) => void;
@@ -32,6 +33,9 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab }) => {
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-[#F7F5EF]/80 mb-4">Platform Pages</h4>
             <ul className="space-y-2.5 text-sm text-[#F7F5EF]/90">
+              <li>
+                <Link href="/blog" className="hover:text-white transition-colors">Mental Health Blog</Link>
+              </li>
               <li>
                 <button onClick={() => setActiveTab('home')} className="hover:text-white transition-colors">
                   Home & Care Philosophy

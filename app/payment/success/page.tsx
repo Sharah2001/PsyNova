@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -119,7 +119,7 @@ function formatCurrency(amount: number) {
 function isPaymentConfirmed(booking: Booking) {
   return booking.paymentStatus === "paid" && booking.status === "confirmed";
 }
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams();
 
   const orderId = searchParams.get("order_id");
@@ -720,5 +720,13 @@ export default function PaymentSuccessPage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">Loading payment details…</main>}>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }

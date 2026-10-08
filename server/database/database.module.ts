@@ -7,6 +7,7 @@ import { PatientEntity } from './entities/patient.entity';
 import { ReviewEntity } from './entities/review.entity';
 import { ComplaintEntity } from './entities/complaint.entity';
 import { SettingsEntity } from './entities/settings.entity';
+import { BlogEntity } from './entities/blog.entity';
 
 @Global()
 @Module({
@@ -24,6 +25,7 @@ import { SettingsEntity } from './entities/settings.entity';
             ReviewEntity,
             ComplaintEntity,
             SettingsEntity,
+            BlogEntity,
           ],
           migrationsRun: false,
           autoLoadEntities: true,
@@ -37,6 +39,7 @@ import { SettingsEntity } from './entities/settings.entity';
       ReviewEntity,
       ComplaintEntity,
       SettingsEntity,
+      BlogEntity,
     ]),
   ],
   exports: [TypeOrmModule],
